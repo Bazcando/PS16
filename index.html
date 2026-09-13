@@ -125,7 +125,22 @@ html{scroll-behavior:smooth}
 @media(max-width:620px){.scene-sync-grid{grid-template-columns:repeat(2,1fr)}.scene-sync-grid label:last-child{grid-column:1/-1}}
 
 
-  </style>
+  
+#applyScale.assigned{
+  background:linear-gradient(180deg,#f6d265,#d6ad35);
+  color:#111;
+  border-color:#f6d265;
+  box-shadow:0 0 0 2px rgba(246,210,101,.18),0 0 16px rgba(246,210,101,.35),inset 0 -2px 0 rgba(0,0,0,.18);
+  font-weight:800;
+}
+
+
+.floating-transport{position:fixed;right:18px;bottom:18px;z-index:9999;width:68px;height:68px;border-radius:50%;display:grid;place-items:center;font-size:1.55rem;font-weight:800;background:linear-gradient(145deg,#2d2d2d,#181818);border:2px solid #5a5a5a;box-shadow:0 10px 26px rgba(0,0,0,.5),inset 0 -3px 0 rgba(0,0,0,.4);touch-action:manipulation}
+.floating-transport.playing{background:linear-gradient(145deg,#b73333,#741f1f);border-color:#f06b6b;box-shadow:0 0 0 3px rgba(240,107,107,.12),0 10px 28px rgba(0,0,0,.55)}
+.floating-transport:active{transform:scale(.96)}
+@media(max-width:520px){.floating-transport{right:14px;bottom:14px;width:64px;height:64px;font-size:1.45rem}}
+
+</style>
 </head>
 <body>
   <main class="shell">
@@ -1000,16 +1015,25 @@ function scheduler(){
   }
   timer=setTimeout(scheduler,lookahead);
 }
+
+function updateFloatingTransport(){
+  const b=$('floatingTransport'); if(!b) return;
+  b.textContent=playing?'■':'▶';
+  b.classList.toggle('playing',playing);
+  b.setAttribute('aria-label',playing?'Stop sequence':'Play sequence');
+  b.title=playing?'Stop':'Play';
+}
+
 async function play(){
   clearTimeout(auditionTimer); auditionTimer=null;
   await ensureAudio(); if(playing) return; saveCurrentPattern();
   if(chainMode&&chain.length){ chainPosition=0; selectPattern(chain[0],true); }
-  playing=true; currentStep=0; sequenceStep=0; barsScheduled=0; nextNoteTime=ctx.currentTime+.05;
+  playing=true; updateFloatingTransport(); currentStep=0; sequenceStep=0; barsScheduled=0; nextNoteTime=ctx.currentTime+.05;
   $('statusText').textContent=chainMode&&chain.length?'chain':'playing'; $('statusDot').parentElement.classList.add('running'); scheduler(); renderSteps(); renderPatternUI();
 }
-function stop(){ playing=false; if(timer) clearTimeout(timer); timer=null; currentStep=0; sequenceStep=0; barsScheduled=0; $('statusText').textContent='stopped'; $('statusDot').parentElement.classList.remove('running'); saveCurrentPattern(); renderSteps(); renderPatternUI(); }
+function stop(){ playing=false; updateFloatingTransport(); if(timer) clearTimeout(timer); timer=null; currentStep=0; sequenceStep=0; barsScheduled=0; $('statusText').textContent='stopped'; $('statusDot').parentElement.classList.remove('running'); saveCurrentPattern(); renderSteps(); renderPatternUI(); }
 
-$('audioBtn').onclick=ensureAudio; $('playBtn').onclick=play; $('stopBtn').onclick=stop;
+$('audioBtn').onclick=ensureAudio; $('playBtn').onclick=play; $('stopBtn').onclick=stop; $('floatingTransport').onclick=()=>playing?stop():play();
 $('copyNextPattern').onclick=()=>{
   saveCurrentPattern();
   const next=(selectedPattern+1)%NUM_PATTERNS;
@@ -1246,7 +1270,21 @@ $('chopSample').onclick=async()=>{
 const SCALE_INTERVALS={minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],pentMinor:[0,3,5,7,10],pentMajor:[0,2,4,7,9],dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10]};
 const ROOTS={'C':0,'C#':1,'D':2,'D#':3,'E':4,'F':5,'F#':6,'G':7,'G#':8,'A':9,'A#':10,'B':11};
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-$('applyScale').onclick=()=>{const root=$('scaleRoot').value, ints=SCALE_INTERVALS[$('scaleType').value]||SCALE_INTERVALS.minor, acid=banks[7].pads, baseMidi=36+ROOTS[root];acid.forEach((p,i)=>{const degree=ints[i%ints.length]+12*Math.floor(i/ints.length),m=baseMidi+degree;p.noteHz=440*Math.pow(2,(m-69)/12);p.name='ACID '+NOTE_NAMES[m%12]+(Math.floor(m/12)-1);});if(selectedBank===7)renderPads();scheduleAutoSave();};
+function markScaleApplied(){
+  const root=$('scaleRoot').value;
+  const scaleLabel=$('scaleType').selectedOptions[0]?.textContent||$('scaleType').value;
+  const btn=$('applyScale');
+  btn.classList.add('assigned');
+  btn.textContent=`✓ ${root} ${scaleLabel.toUpperCase()} APPLIED`;
+}
+function markScaleDirty(){
+  const btn=$('applyScale');
+  btn.classList.remove('assigned');
+  btn.textContent='APPLY TO ACID PADS';
+}
+$('scaleRoot').addEventListener('change',markScaleDirty);
+$('scaleType').addEventListener('change',markScaleDirty);
+$('applyScale').onclick=()=>{const root=$('scaleRoot').value, ints=SCALE_INTERVALS[$('scaleType').value]||SCALE_INTERVALS.minor, acid=banks[7].pads, baseMidi=36+ROOTS[root];acid.forEach((p,i)=>{const degree=ints[i%ints.length]+12*Math.floor(i/ints.length),m=baseMidi+degree;p.noteHz=440*Math.pow(2,(m-69)/12);p.name='ACID '+NOTE_NAMES[m%12]+(Math.floor(m/12)-1);});if(selectedBank===7)renderPads();markScaleApplied();scheduleAutoSave();};
 
 $('filter').addEventListener('input',e=>{ if(filterNode&&ctx) filterNode.frequency.setTargetAtTime(+e.target.value,ctx.currentTime,.01); });
 $('delay').addEventListener('input',e=>{ const w=e.target._wet; if(w&&ctx) w.gain.setTargetAtTime(+e.target.value,ctx.currentTime,.01); });
@@ -1424,7 +1462,7 @@ function seedBanks(){
 document.addEventListener('input',e=>{ if(e.target?.id!=='micRecord') scheduleAutoSave(); });
 document.addEventListener('change',scheduleAutoSave);
 document.addEventListener('click',e=>{
-  if(e.target?.closest?.('.pad') || e.target?.id==='playBtn' || e.target?.id==='stopBtn' || e.target?.id==='audioBtn' || e.target?.id==='installBtn') return;
+  if(e.target?.closest?.('.pad') || e.target?.id==='playBtn' || e.target?.id==='stopBtn' || e.target?.id==='audioBtn' || e.target?.id==='installBtn' || e.target?.id==='floatingTransport') return;
   scheduleAutoSave();
 });
 window.addEventListener('pagehide',()=>{ try{localStorage.setItem(PROJECT_KEY,JSON.stringify(makeProjectState()));}catch(_){} });
@@ -1562,6 +1600,7 @@ async function exportWav(){
 if($('exportWav')) $('exportWav').addEventListener('click',exportWav);
 
 initUI();
+updateFloatingTransport();
 initSceneFX();
 loadProjectMeta();
 
@@ -1585,5 +1624,8 @@ if('serviceWorker' in navigator){
 }
 
 </script>
+
+  <button id="floatingTransport" class="floating-transport" aria-label="Play sequence" title="Play / Stop">▶</button>
+
 </body>
 </html>
