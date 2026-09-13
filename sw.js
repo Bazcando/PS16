@@ -1,4 +1,4 @@
-const CACHE = 'ps16-export-v7-oneshot';
+const CACHE = 'ps16-scene-fx-v1';
 const ASSETS = [
   './',
   './index.html',

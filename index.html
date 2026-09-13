@@ -111,6 +111,15 @@ html{scroll-behavior:smooth}
 .mix-master-note{margin-top:10px;color:var(--muted);font-size:.67rem;line-height:1.35}
 @media(max-width:520px){.mixer-grid{grid-template-columns:repeat(3,1fr);gap:7px}.mix-strip{padding:8px}.mix-fader{height:102px}.mix-fader input{width:94px}}
 
+/* SCENE FX */
+.scene-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.scene-btn{min-height:66px;font-weight:900;letter-spacing:.05em;touch-action:none;user-select:none;position:relative;overflow:hidden}
+.scene-btn small{display:block;font-size:.55rem;color:var(--muted);font-weight:500;margin-top:5px;letter-spacing:0}
+.scene-btn.active{background:var(--accent);color:#111;border-color:var(--accent2);box-shadow:0 0 18px rgba(240,138,36,.35)}
+.scene-btn.active small{color:#24180b}
+.scene-status{margin-top:10px;color:var(--muted);font-size:.67rem;text-align:center;min-height:1.2em}
+@media(max-width:620px){.scene-grid{grid-template-columns:repeat(2,1fr)}.scene-btn:last-child{grid-column:1/-1}}
+
   </style>
 </head>
 <body>
@@ -128,6 +137,7 @@ html{scroll-behavior:smooth}
       <button data-jump="seqSection">SEQ</button>
       <button data-jump="patternsSection">PATTERNS</button>
       <button data-jump="mixSection">MIX</button>
+      <button data-jump="sceneSection">SCENE</button>
       <button data-jump="playSection">PLAY</button>
       <button data-jump="fxSection">FX</button>
     </nav>
@@ -231,6 +241,18 @@ html{scroll-behavior:smooth}
       <div class="mix-master-note">The sequence keeps running while you mix. SOLO lets you monitor one or more banks; MUTE removes a bank from the live mix. Activity lights show the channels currently firing.</div>
     </section>
 
+    <section id="sceneSection" class="panel controls">
+      <div class="section-head"><h2>SCENE FX</h2><span>hold to perform · release to return</span></div>
+      <div class="scene-grid">
+        <button class="scene-btn" data-scene="stutter">STUTTER<small>rhythmic gate</small></button>
+        <button class="scene-btn" data-scene="filter">FILTER DROP<small>dark sweep</small></button>
+        <button class="scene-btn" data-scene="tape">TAPE STOP<small>drop + fade</small></button>
+        <button class="scene-btn" data-scene="echo">ECHO THROW<small>big delay burst</small></button>
+        <button class="scene-btn" data-scene="glitch">GLITCH<small>random chops</small></button>
+      </div>
+      <div id="sceneStatus" class="scene-status">Hold an effect while the track is playing.</div>
+    </section>
+
     <section id="playSection" class="panel controls">
       <div class="section-head"><h2>PLAYGROUND</h2><span>drag knobs up/down · double-tap reset</span></div>
       <div class="synth-grid">
@@ -310,7 +332,7 @@ function newPad(i){
 const banks=BANK_DEFS.map((b)=>({name:b.name,hue:b.hue,pads:Array.from({length:NUM_PADS},(_,i)=>newPad(i))}));
 const mixer=BANK_DEFS.map(()=>({volume:1,mute:false,solo:false}));
 let bankGainNodes=[];
-let ctx=null, master=null, filterNode=null, driveNode=null, delayNode=null, feedbackNode=null, dryNode=null;
+let ctx=null, master=null, filterNode=null, driveNode=null, delayNode=null, feedbackNode=null, dryNode=null, sceneGate=null;
 let selectedBank=0, selectedPad=0, currentStep=0, sequenceStep=0, playing=false, timer=null, nextNoteTime=0;
 let micRecorder=null, micStream=null, micChunks=[], micStopTimer=null, micStartedAt=0, micTicker=null;
 const NUM_PATTERNS=8;
@@ -419,6 +441,26 @@ async function restoreCustomAudio(){
     }catch(err){ console.warn('Sample restore failed',bi,pi,err); }
   }
   renderPads(); updateSelectedLabel(); syncControls();
+}
+
+function repairAcidBank(){
+  // Project restore can contain older pad state where the dedicated ACID engine
+  // was missing/null. Restore the live synth engine for ACID pads unless the
+  // user has explicitly replaced that pad with a recorded/imported sample.
+  const acid=banks[7]?.pads;
+  if(!acid) return;
+  const defaultFreq=[65.41,69.30,73.42,77.78,82.41,87.31,92.50,98.00,103.83,110.00,116.54,123.47,130.81,138.59,146.83,155.56];
+  const defaultNames=['C2','C#2','D2','D#2','E2','F2','F#2','G2','G#2','A2','A#2','B2','C3','C#3','D3','D#3'];
+  acid.forEach((p,i)=>{
+    const hasCustomAudio=!!p.sourceBlob || !!p.hasCustomAudio;
+    if(!hasCustomAudio){
+      p.engine='acid';
+      p.buffer=null;
+      p.oneShot=false;
+      if(!Number.isFinite(p.noteHz) || p.noteHz<=0) p.noteHz=defaultFreq[i];
+      if(!p.name || /^PAD\s/i.test(p.name)) p.name='ACID '+defaultNames[i];
+    }
+  });
 }
 async function saveProject(showStatus=true){
   try{
@@ -576,6 +618,7 @@ async function ensureAudio(){
   if(!ctx){
     ctx=new (window.AudioContext||window.webkitAudioContext)();
     master=ctx.createGain();
+    sceneGate=ctx.createGain(); sceneGate.gain.value=1;
     filterNode=ctx.createBiquadFilter(); filterNode.type='lowpass'; filterNode.frequency.value=18000;
     delayNode=ctx.createDelay(1); delayNode.delayTime.value=.25;
     feedbackNode=ctx.createGain(); feedbackNode.gain.value=.25;
@@ -584,15 +627,17 @@ async function ensureAudio(){
     const wet=ctx.createGain(); wet.gain.value=0;
     bankGainNodes=BANK_DEFS.map(()=>{const g=ctx.createGain();g.gain.value=1;g.connect(filterNode);return g;});
     filterNode.connect(driveNode);
-    driveNode.connect(dryNode).connect(master);
-    driveNode.connect(delayNode).connect(wet).connect(master);
+    driveNode.connect(dryNode).connect(sceneGate);
+    driveNode.connect(delayNode).connect(wet).connect(sceneGate);
     delayNode.connect(feedbackNode).connect(delayNode);
-    master.connect(ctx.destination);
+    sceneGate.connect(master).connect(ctx.destination);
     $('delay')._wet=wet;
     updateMixerAudio();
     seedBanks();
     if(projectMetaLoaded) loadProjectMeta();
     await restoreCustomAudio();
+    repairAcidBank();
+    renderPads(); updateSelectedLabel(); syncControls();
   }
   if(ctx.state==='suspended') await ctx.resume();
   $('audioBtn').textContent='AUDIO ON';
@@ -849,6 +894,59 @@ function pulseMixer(bankIndex,time){
   setTimeout(()=>{const led=$('mixLed'+bankIndex);if(!led)return;led.classList.add('on');setTimeout(()=>led.classList.remove('on'),90)},ms);
 }
 function resetMix(){ mixer.forEach(ch=>{ch.volume=1;ch.mute=false;ch.solo=false});renderMixer();updateMixerAudio();scheduleAutoSave(); }
+
+let activeScene=null, sceneTimer=null, sceneSaved=null;
+function clearSceneTimer(){ if(sceneTimer){ clearInterval(sceneTimer); sceneTimer=null; } }
+function currentMasterFilter(){ return +$('filter').value || 18000; }
+function currentDelayWet(){ return +$('delay').value || 0; }
+function currentFeedback(){ return +$('feedback').value || .25; }
+function beginScene(name,btn){
+  if(!ctx) ensureAudio().then(()=>beginScene(name,btn));
+  if(!ctx || activeScene===name) return;
+  if(activeScene) endScene(activeScene);
+  activeScene=name; clearSceneTimer();
+  sceneSaved={filter:currentMasterFilter(),delay:currentDelayWet(),feedback:currentFeedback(),delayTime:delayNode?.delayTime.value||.25};
+  document.querySelectorAll('.scene-btn').forEach(b=>b.classList.toggle('active',b===btn));
+  if($('sceneStatus')) $('sceneStatus').textContent=name.toUpperCase()+' ACTIVE';
+  const now=ctx.currentTime;
+  try{ sceneGate.gain.cancelScheduledValues(now); sceneGate.gain.setValueAtTime(sceneGate.gain.value,now); }catch(e){}
+  if(name==='filter'){
+    filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setValueAtTime(Math.max(350,sceneSaved.filter),now); filterNode.frequency.exponentialRampToValueAtTime(350,now+.45);
+  }else if(name==='echo'){
+    const wet=$('delay')._wet; if(wet) wet.gain.setTargetAtTime(.82,now,.02); feedbackNode.gain.setTargetAtTime(.68,now,.02); delayNode.delayTime.setTargetAtTime(.28,now,.02);
+  }else if(name==='tape'){
+    sceneGate.gain.setValueAtTime(Math.max(.001,sceneGate.gain.value),now); sceneGate.gain.exponentialRampToValueAtTime(.015,now+.85);
+    filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setValueAtTime(Math.max(600,sceneSaved.filter),now); filterNode.frequency.exponentialRampToValueAtTime(280,now+.85);
+  }else if(name==='stutter'){
+    let on=true; const interval=Math.max(45,secondsPerStep()*500);
+    sceneTimer=setInterval(()=>{ if(!ctx||activeScene!=='stutter')return; on=!on; sceneGate.gain.setTargetAtTime(on?1:.03,ctx.currentTime,.005); },interval);
+  }else if(name==='glitch'){
+    sceneTimer=setInterval(()=>{ if(!ctx||activeScene!=='glitch')return; const now=ctx.currentTime; sceneGate.gain.setTargetAtTime(Math.random()>.35?1:.03,now,.004); filterNode.frequency.setTargetAtTime(350+Math.random()*Math.max(700,sceneSaved.filter),now,.01); },70);
+  }
+}
+function endScene(name){
+  if(!ctx || (name && activeScene!==name)) return;
+  clearSceneTimer(); const now=ctx.currentTime;
+  const saved=sceneSaved||{filter:currentMasterFilter(),delay:currentDelayWet(),feedback:currentFeedback(),delayTime:.25};
+  try{ sceneGate.gain.cancelScheduledValues(now); sceneGate.gain.setTargetAtTime(1,now,.025); }catch(e){}
+  try{ filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setTargetAtTime(Math.max(300,saved.filter),now,.035); }catch(e){}
+  try{ const wet=$('delay')._wet; if(wet) wet.gain.setTargetAtTime(saved.delay,now,.04); feedbackNode.gain.setTargetAtTime(saved.feedback,now,.04); delayNode.delayTime.setTargetAtTime(saved.delayTime,now,.04); }catch(e){}
+  activeScene=null; sceneSaved=null;
+  document.querySelectorAll('.scene-btn').forEach(b=>b.classList.remove('active'));
+  if($('sceneStatus')) $('sceneStatus').textContent='Hold an effect while the track is playing.';
+}
+function initSceneFX(){
+  document.querySelectorAll('.scene-btn').forEach(btn=>{
+    const name=btn.dataset.scene;
+    const start=e=>{ e.preventDefault(); beginScene(name,btn); };
+    const end=e=>{ e.preventDefault(); endScene(name); };
+    btn.addEventListener('pointerdown',start);
+    btn.addEventListener('pointerup',end);
+    btn.addEventListener('pointercancel',end);
+    btn.addEventListener('pointerleave',e=>{ if(e.buttons) end(e); });
+    btn.addEventListener('contextmenu',e=>e.preventDefault());
+  });
+}
 
 function secondsPerStep(){ return (60/Math.max(40,Math.min(240,+$('bpm').value||120)))/4; }
 function scheduleStep(step,time){
@@ -1436,6 +1534,7 @@ async function exportWav(){
 if($('exportWav')) $('exportWav').addEventListener('click',exportWav);
 
 initUI();
+initSceneFX();
 loadProjectMeta();
 
 let deferredInstallPrompt=null;
