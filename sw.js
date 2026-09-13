@@ -1,4 +1,4 @@
-const CACHE = 'ps16-v7-persistence';
+const CACHE = 'ps16-snapmix-v1';
 const ASSETS = [
   './',
   './index.html',
