@@ -149,6 +149,16 @@ html{scroll-behavior:smooth}
 .track-chip .track-num{font-weight:800;font-size:.72rem}
 .track-chip .track-count{font-size:.52rem;opacity:.8}
 @media(max-width:520px){.track-overview{grid-template-columns:repeat(8,1fr);gap:4px}.track-chip{min-height:38px;padding:3px 2px}}
+
+/* ACID 303-style instrument strip */
+.acid-panel{border-color:#5c6648;background:linear-gradient(180deg,#34382a,#1c1f18)}
+.acid-panel .section-head h2{color:#d7df76}
+.acid-303-grid{grid-template-columns:repeat(7,1fr)}
+.acid-panel .knob{border-color:#70785b;background:radial-gradient(circle at 35% 30%,#696c5e 0,#34382f 42%,#171a15 74%)}
+.acid-panel .knob:after{background:#e5ec75;box-shadow:0 0 5px rgba(229,236,117,.4)}
+.acid-wave{background:#353b29;border-color:#70785b;color:#eef59a}
+@media(max-width:700px){.acid-303-grid{grid-template-columns:repeat(3,1fr)}}
+
 </style>
 </head>
 <body>
@@ -305,15 +315,18 @@ html{scroll-behavior:smooth}
     </section>
 
     <section id="acidPanel" class="panel controls acid-panel">
-      <div class="section-head"><h2>ACID ENGINE</h2><span>live monosynth</span></div>
-      <div class="acid-grid">
+      <div class="section-head"><h2>ACID ENGINE</h2><span>303-style monosynth</span></div>
+      <div class="acid-grid acid-303-grid">
+        <label class="knob-wrap">TUNE<div class="knob"><input id="acidTune" type="range" min="-12" max="12" value="0" step="1"></div><span class="knob-value" id="acidTuneVal">0 st</span></label>
+        <label class="knob-wrap">CUTOFF<div class="knob"><input id="acidCutoff" type="range" min="0" max="1" value="0.46" step="0.01"></div><span class="knob-value" id="acidCutoffVal">46%</span></label>
         <label class="knob-wrap">RESONANCE<div class="knob"><input id="acidRes" type="range" min="0" max="1" value="0.65" step="0.01"></div><span class="knob-value" id="acidResVal">65%</span></label>
         <label class="knob-wrap">ENV MOD<div class="knob"><input id="acidEnv" type="range" min="0" max="1" value="0.7" step="0.01"></div><span class="knob-value" id="acidEnvVal">70%</span></label>
-        <label class="knob-wrap">GLIDE<div class="knob"><input id="acidGlide" type="range" min="0" max="1" value="0.2" step="0.01"></div><span class="knob-value" id="acidGlideVal">20%</span></label>
+        <label class="knob-wrap">DECAY<div class="knob"><input id="acidDecay" type="range" min="0.05" max="2.5" value="0.34" step="0.01"></div><span class="knob-value" id="acidDecayVal">0.34 s</span></label>
         <label class="knob-wrap">ACCENT<div class="knob"><input id="acidAccent" type="range" min="0" max="1" value="0.35" step="0.01"></div><span class="knob-value" id="acidAccentVal">35%</span></label>
+        <label class="knob-wrap">GLIDE<div class="knob"><input id="acidGlide" type="range" min="0" max="1" value="0.2" step="0.01"></div><span class="knob-value" id="acidGlideVal">20%</span></label>
       </div>
       <div class="button-row"><button id="acidWave" class="acid-wave">WAVE: SAW</button></div>
-      <div class="small-note">Tone acts as cutoff. Pitch transposes each acid pad. Wobble and grit still work too.</div>
+      <div class="small-note">Dedicated acid controls: Tune transposes the selected note, Cutoff shapes the filter, and Decay controls the acid envelope. Wobble and Grit still work as extra performance colour.</div>
     </section>
 
     <section id="fxSection" class="panel controls">
@@ -346,7 +359,7 @@ html{scroll-behavior:smooth}
       <div class="small-note">Tip: download WAV one-shots, then return here and use LOAD SAMPLE on the selected pad.</div>
     </section>
 
-    <footer>Includes original 808/909-style drum synthesis and a live ACID monosynth bank with resonance, envelope, glide and accent.</footer>
+    <footer>Includes upgraded factory sounds, three USER banks (48 sample pads), original 808/909-style drums and a live ACID monosynth.</footer>
   </main>
 
   <button id="floatingTransport" class="floating-transport" aria-label="Play sequence" title="Play / Stop">▶</button>
@@ -357,12 +370,12 @@ const BANK_DEFS=[
   {name:'DRUMS', hue:22},
   {name:'BASS', hue:165},
   {name:'SYNTH', hue:228},
-  {name:'BRASS', hue:44},
-  {name:'PERC', hue:322},
+  {name:'USER 1', hue:292},
+  {name:'USER 2', hue:332},
   {name:'808', hue:8},
   {name:'909', hue:52},
   {name:'ACID', hue:112},
-  {name:'USER', hue:280}
+  {name:'USER 3', hue:270}
 ];
 
 function newPad(i){
@@ -424,6 +437,12 @@ function applyProjectState(state){
       const keepBuffer=p.buffer, keepBlob=p.sourceBlob;
       Object.assign(p,saved);
       p.buffer=keepBuffer; p.sourceBlob=keepBlob; p.oneShot=!!saved.oneShot;
+      // BANK MIGRATION: old BRASS/PERC slots are now USER 1/USER 2.
+      // Preserve custom recordings/imports and sequencer data, but do not resurrect
+      // the old generated factory sounds into the new user banks.
+      if((bi===3 || bi===4) && !saved.hasCustomAudio && !keepBlob){
+        p.buffer=null; p.engine=null; p.oneShot=false; p.name=`PAD ${pi+1}`;
+      }
       p.steps=(saved.steps||Array(NUM_STEPS).fill(false)).slice();
       p.pitchLocks=(saved.pitchLocks||Array(NUM_STEPS).fill(null)).slice();
       p.probabilityLocks=(saved.probabilityLocks||Array(NUM_STEPS).fill(100)).slice(); p.ratchetLocks=(saved.ratchetLocks||Array(NUM_STEPS).fill(1)).slice();
@@ -717,6 +736,9 @@ function syncControls(){
   const p=currentPadObj();
   $('volume').value=p.volume; $('pitch').value=p.pitch; $('start').value=p.start; $('end').value=p.end;
   ['wobble','trem','grit','space','pan','tone','attack','decay'].forEach(id=>{$(id).value=p[id]; updateKnob(id);});
+  if($('acidTune')){ $('acidTune').value=p.pitch||0; updateKnob('acidTune'); }
+  if($('acidCutoff')){ $('acidCutoff').value=p.tone??0.46; updateKnob('acidCutoff'); }
+  if($('acidDecay')){ $('acidDecay').value=p.decay??0.34; updateKnob('acidDecay'); }
   ['acidRes','acidEnv','acidGlide','acidAccent'].forEach(id=>{if($(id)){ $(id).value=p[id]; updateKnob(id); }});
   if($('acidWave')) $('acidWave').textContent='WAVE: '+(p.acidWave==='square'?'SQUARE':'SAW');
 }
@@ -1106,6 +1128,9 @@ function updateKnob(id){
   else if(id==='tone') val.textContent=v<.28?'DARK':v<.68?'WARM':'BRIGHT';
   else if(id==='attack') val.textContent=v<1?Math.round(v*1000)+' ms':v.toFixed(2)+' s';
   else if(id==='decay') val.textContent=v.toFixed(2)+' s';
+  else if(id==='acidTune') val.textContent=(v>0?'+':'')+Math.round(v)+' st';
+  else if(id==='acidCutoff') val.textContent=Math.round(v*100)+'%';
+  else if(id==='acidDecay') val.textContent=v.toFixed(2)+' s';
   else if(id==='acidRes'||id==='acidEnv'||id==='acidGlide'||id==='acidAccent') val.textContent=Math.round(v*100)+'%';
 }
 const PLAY_KNOBS=['wobble','trem','grit','space','pan','tone','attack','decay'];
@@ -1115,9 +1140,16 @@ PLAY_KNOBS.forEach(id=>{
 });
 
 
-const ACID_KNOBS=['acidRes','acidEnv','acidGlide','acidAccent'];
+const ACID_KNOBS=['acidTune','acidCutoff','acidRes','acidEnv','acidDecay','acidAccent','acidGlide'];
 ACID_KNOBS.forEach(id=>{
-  $(id).addEventListener('input',e=>{currentPadObj()[id]=+e.target.value;updateKnob(id);auditionSelected();});
+  $(id).addEventListener('input',e=>{
+    const p=currentPadObj(), v=+e.target.value;
+    if(id==='acidTune') p.pitch=v;
+    else if(id==='acidCutoff') p.tone=v;
+    else if(id==='acidDecay') p.decay=v;
+    else p[id]=v;
+    updateKnob(id); auditionSelected(); scheduleAutoSave?.();
+  });
   updateKnob(id);
 });
 $('acidWave').addEventListener('click',()=>{const p=currentPadObj();p.acidWave=p.acidWave==='square'?'sawtooth':'square';$('acidWave').textContent='WAVE: '+(p.acidWave==='square'?'SQUARE':'SAW');auditionSelected(20);});
@@ -1139,7 +1171,11 @@ $('acidWave').addEventListener('click',()=>{const p=currentPadObj();p.acidWave=p
     const st=step(); value=Math.round(value/st)*st;
     value=Math.max(min(),Math.min(max(),value));
     input.value=value;
-    currentPadObj()[id]=+input.value;
+    const p=currentPadObj(), v=+input.value;
+    if(id==='acidTune') p.pitch=v;
+    else if(id==='acidCutoff') p.tone=v;
+    else if(id==='acidDecay') p.decay=v;
+    else p[id]=v;
     updateKnob(id); auditionSelected(110);
     e.preventDefault();
   });
@@ -1341,32 +1377,42 @@ function fadeOut(t,total,tail=.02){ return t>total-tail?Math.max(0,(total-t)/tai
 function sawish(t,f,h=10){ let s=0; for(let n=1;n<=h;n++) s+=Math.sin(2*Math.PI*f*n*t)/n; return s; }
 function squareish(t,f,h=9){ let s=0; for(let n=1;n<=h;n+=2) s+=Math.sin(2*Math.PI*f*n*t)/n; return s; }
 function triish(t,f,h=11){ let s=0,sign=1; for(let n=1;n<=h;n+=2){ s+=sign*Math.sin(2*Math.PI*f*n*t)/(n*n); sign*=-1; } return s*8/Math.PI/Math.PI; }
+function softClip(x,drive=1.5){ return Math.tanh(x*drive)/Math.tanh(drive); }
+function hpNoise(prev, white, amount=.94){ return white-prev*amount; }
 function bassTone(f,style='sub'){
-  return makeBuffer(1.2,(t)=>{
-    const e=Math.exp(-t*2.6)*fadeOut(t,1.2,.04);
+  let lp=0;
+  return makeBuffer(1.35,(t)=>{
+    const a=1-Math.exp(-t*90);
+    const e=a*Math.exp(-t*(style==='sub'?2.0:2.8))*fadeOut(t,1.35,.05);
+    const sub=Math.sin(2*Math.PI*f*t);
     let x=0;
-    if(style==='sub') x=.95*Math.sin(2*Math.PI*f*t)+.22*Math.sin(2*Math.PI*f*2*t);
-    else if(style==='acid') x=.5*sawish(t,f,14)+.18*Math.sin(2*Math.PI*f*2.01*t);
-    else if(style==='pluck') x=.55*squareish(t,f,11)+.1*Math.sin(2*Math.PI*f*4*t);
-    else if(style==='reese') x=.38*sawish(t,f*.995,10)+.38*sawish(t,f*1.005,10);
-    else if(style==='fm') x=Math.sin(2*Math.PI*f*t + 2.3*Math.sin(2*Math.PI*(f*1.99)*t));
-    else if(style==='muted') x=.45*squareish(t,f,7)*Math.exp(-t*8);
-    else x=.6*sawish(t,f,10);
-    return clamp(x*e,-1,1);
+    if(style==='sub') x=1.0*sub+.18*Math.sin(2*Math.PI*f*2*t)+.08*Math.sin(2*Math.PI*f*.5*t);
+    else if(style==='acid') x=.50*sawish(t,f,18)+.22*sawish(t,f*1.003,12)+.12*sub;
+    else if(style==='pluck') x=.50*squareish(t,f,13)*Math.exp(-t*5.2)+.28*sub;
+    else if(style==='reese') x=.34*sawish(t,f*.992,14)+.34*sawish(t,f*1.008,14)+.16*sub;
+    else if(style==='fm') x=.76*Math.sin(2*Math.PI*f*t+2.8*Math.exp(-t*3)*Math.sin(2*Math.PI*f*1.997*t))+.12*sub;
+    else if(style==='muted') x=.48*squareish(t,f,9)*Math.exp(-t*7)+.35*sub;
+    else x=.48*sawish(t,f,14)+.24*sub;
+    // tiny low-pass smoothing to tame aliasing, then saturation
+    lp += .18*(x-lp);
+    return softClip(lp*e*1.35,1.6)*.92;
   });
 }
 function synthTone(f,style='lead'){
-  return makeBuffer(1.5,(t)=>{
-    const e=Math.exp(-t*1.8)*fadeOut(t,1.5,.06);
+  let lp=0;
+  return makeBuffer(1.7,(t)=>{
+    const a=1-Math.exp(-t*(style==='pad'?5:70));
+    const e=a*Math.exp(-t*(style==='pad'?.9:1.55))*fadeOut(t,1.7,.08);
     let x=0;
-    if(style==='lead') x=.55*sawish(t,f,14)+.15*Math.sin(2*Math.PI*f*2*t);
-    else if(style==='pad') x=.26*sawish(t,f*.997,10)+.26*sawish(t,f*1.003,10)+.18*triish(t,f*.5,7);
-    else if(style==='pluck') x=.62*squareish(t,f,9)*Math.exp(-t*4.4);
-    else if(style==='bell') x=.7*Math.sin(2*Math.PI*f*t+2.5*Math.sin(2*Math.PI*f*2.6*t))*Math.exp(-t*2.8);
-    else if(style==='organ') x=.5*Math.sin(2*Math.PI*f*t)+.28*Math.sin(2*Math.PI*f*2*t)+.16*Math.sin(2*Math.PI*f*3*t);
-    else if(style==='arp') x=.42*squareish(t,f,11)+.2*Math.sin(2*Math.PI*f*4*t);
-    else x=.55*sawish(t,f,12);
-    return clamp(x*e,-1,1);
+    if(style==='lead') x=.38*sawish(t,f*.998,16)+.38*sawish(t,f*1.002,16)+.12*Math.sin(2*Math.PI*f*2*t);
+    else if(style==='pad') x=.22*sawish(t,f*.994,12)+.22*sawish(t,f*1.006,12)+.20*triish(t,f*.5,9)+.14*Math.sin(2*Math.PI*f*2*t);
+    else if(style==='pluck') x=.48*squareish(t,f,11)*Math.exp(-t*4.8)+.22*Math.sin(2*Math.PI*f*t);
+    else if(style==='bell') x=.58*Math.sin(2*Math.PI*f*t+2.9*Math.exp(-t*1.7)*Math.sin(2*Math.PI*f*2.72*t))+.16*Math.sin(2*Math.PI*f*4.1*t);
+    else if(style==='organ') x=.42*Math.sin(2*Math.PI*f*t)+.27*Math.sin(2*Math.PI*f*2*t)+.16*Math.sin(2*Math.PI*f*3*t)+.09*Math.sin(2*Math.PI*f*4*t);
+    else if(style==='arp') x=.34*squareish(t,f,13)+.20*Math.sin(2*Math.PI*f*2*t)+.10*Math.sin(2*Math.PI*f*4*t);
+    else x=.44*sawish(t,f,14)+.18*Math.sin(2*Math.PI*f*t);
+    lp += .22*(x-lp);
+    return softClip(lp*e*1.15,1.35)*.9;
   });
 }
 function brassTone(f,style='stab'){
@@ -1386,24 +1432,37 @@ function percNoise(total,decay,mix=1){
 }
 function mixBuffers(seconds,fn){ return makeBuffer(seconds,fn); }
 function seedBanks(){
-  // DRUMS
+  // DRUMS — upgraded layered factory one-shots
   const d=banks[0].pads;
-  d[0].buffer=makeBuffer(.55,t=>Math.sin(2*Math.PI*(115*Math.exp(-t*16)+40)*t)*Math.exp(-t*9)); d[0].name='KICK';
-  d[1].buffer=makeBuffer(.35,t=>((Math.random()*2-1)*.75+Math.sin(2*Math.PI*190*t)*.25)*Math.exp(-t*15)); d[1].name='SNARE';
-  d[2].buffer=makeBuffer(.14,t=>((Math.random()*2-1))*Math.exp(-t*40)); d[2].name='HAT';
-  d[3].buffer=makeBuffer(.25,t=>((Math.random()*2-1)*.8+Math.sin(2*Math.PI*420*t)*.15)*Math.exp(-t*22)); d[3].name='CLAP';
-  d[4].buffer=makeBuffer(.4,t=>Math.sin(2*Math.PI*(170*Math.exp(-t*10)+80)*t)*Math.exp(-t*8)); d[4].name='TOM LOW';
-  d[5].buffer=makeBuffer(.28,t=>Math.sin(2*Math.PI*(245*Math.exp(-t*8)+110)*t)*Math.exp(-t*9)); d[5].name='TOM HI';
-  d[6].buffer=makeBuffer(.11,t=>((Math.random()*2-1)*.5+Math.sin(2*Math.PI*800*t)*.18)*Math.exp(-t*30)); d[6].name='RIM';
-  d[7].buffer=makeBuffer(.5,t=>((Math.random()*2-1)*.82)*Math.exp(-t*8)); d[7].name='CYMBAL';
-  d[8].buffer=makeBuffer(.18,t=>Math.sin(2*Math.PI*60*t)*Math.exp(-t*26)); d[8].name='SUB KICK';
-  d[9].buffer=makeBuffer(.3,t=>((Math.random()*2-1)*.55+Math.sin(2*Math.PI*280*t)*.2)*Math.exp(-t*18)); d[9].name='SNAP';
-  d[10].buffer=makeBuffer(.08,t=>((Math.random()*2-1))*Math.exp(-t*65)); d[10].name='OH HAT';
-  d[11].buffer=makeBuffer(.12,t=>Math.sin(2*Math.PI*950*t)*Math.exp(-t*32)); d[11].name='CLICK';
-  d[12].buffer=makeBuffer(.25,t=>Math.sin(2*Math.PI*520*t)*Math.exp(-t*24)); d[12].name='ZAP';
-  d[13].buffer=makeBuffer(.2,t=>((Math.random()*2-1)*.65)*Math.exp(-t*26)); d[13].name='NOISE';
-  d[14].buffer=makeBuffer(.15,t=>Math.sin(2*Math.PI*(330+40*Math.sin(2*Math.PI*22*t))*t)*Math.exp(-t*22)); d[14].name='LASER';
-  d[15].buffer=makeBuffer(.3,t=>((Math.random()*2-1)*.3+Math.sin(2*Math.PI*120*t)*.4)*Math.exp(-t*14)); d[15].name='FX TOM';
+  d[0].buffer=makeBuffer(.72,t=>{
+    const f=48+135*Math.exp(-t*32), body=Math.sin(2*Math.PI*f*t)*Math.exp(-t*6.3);
+    const click=(Math.random()*2-1)*Math.exp(-t*95)*.16;
+    return softClip((body+click)*1.45,1.7)*.92;
+  }); d[0].name='KICK PUNCH';
+  d[1].buffer=makeBuffer(.46,t=>{
+    const white=(Math.random()*2-1), noise=white*Math.exp(-t*14)*.72;
+    const body=(Math.sin(2*Math.PI*178*t)*.34+Math.sin(2*Math.PI*312*t)*.12)*Math.exp(-t*11);
+    const snap=white*Math.exp(-t*70)*.24;
+    return softClip((noise+body+snap)*1.25,1.4)*.9;
+  }); d[1].name='SNARE FAT';
+  d[2].buffer=makeBuffer(.12,t=>{const n=(Math.random()*2-1);return softClip(n*Math.exp(-t*48)*1.15,1.3)*.72;}); d[2].name='HAT TIGHT';
+  d[3].buffer=makeBuffer(.31,t=>{
+    const n=(Math.random()*2-1), bursts=(Math.exp(-t*65)+.75*Math.exp(-Math.max(0,t-.018)*80)+.55*Math.exp(-Math.max(0,t-.036)*85));
+    return softClip(n*bursts*.62*Math.exp(-t*5.5),1.5)*.82;
+  }); d[3].name='CLAP WIDE';
+  d[4].buffer=makeBuffer(.5,t=>softClip((Math.sin(2*Math.PI*(122+80*Math.exp(-t*12))*t)+.14*Math.sin(2*Math.PI*244*t))*Math.exp(-t*7.5)*1.25,1.4)*.88); d[4].name='TOM LOW';
+  d[5].buffer=makeBuffer(.4,t=>softClip((Math.sin(2*Math.PI*(188+95*Math.exp(-t*12))*t)+.12*Math.sin(2*Math.PI*376*t))*Math.exp(-t*8.5)*1.2,1.4)*.86); d[5].name='TOM HIGH';
+  d[6].buffer=makeBuffer(.105,t=>softClip((Math.sin(2*Math.PI*1120*t)*.65+(Math.random()*2-1)*.22)*Math.exp(-t*42)*1.3,1.5)*.82); d[6].name='RIM';
+  d[7].buffer=makeBuffer(.7,t=>{const n=(Math.random()*2-1);const metal=.22*Math.sin(2*Math.PI*6150*t)+.18*Math.sin(2*Math.PI*7800*t);return softClip((n*.55+metal)*Math.exp(-t*6.5)*1.1,1.2)*.78;}); d[7].name='CYMBAL';
+  d[8].buffer=makeBuffer(.95,t=>softClip(Math.sin(2*Math.PI*(64+35*Math.exp(-t*18))*t)*Math.exp(-t*4.1)*1.5,1.7)*.95); d[8].name='SUB KICK';
+  d[9].buffer=makeBuffer(.22,t=>{const n=(Math.random()*2-1);return softClip((n*.82+Math.sin(2*Math.PI*420*t)*.12)*Math.exp(-t*22)*1.2,1.5)*.78;}); d[9].name='SNAP';
+  d[10].buffer=makeBuffer(.45,t=>{const n=(Math.random()*2-1);return softClip(n*Math.exp(-t*12)*1.1,1.25)*.7;}); d[10].name='OPEN HAT';
+  d[11].buffer=makeBuffer(.09,t=>softClip((Math.sin(2*Math.PI*2100*t)*.7+(Math.random()*2-1)*.16)*Math.exp(-t*48)*1.2,1.4)*.78); d[11].name='CLICK';
+  d[12].buffer=makeBuffer(.32,t=>softClip(Math.sin(2*Math.PI*(860-420*t)*t)*Math.exp(-t*11)*1.25,1.3)*.82); d[12].name='ZAP';
+  d[13].buffer=makeBuffer(.26,t=>softClip((Math.random()*2-1)*Math.exp(-t*18)*1.25,1.4)*.75); d[13].name='NOISE HIT';
+  d[14].buffer=makeBuffer(.24,t=>softClip(Math.sin(2*Math.PI*(360+150*Math.sin(2*Math.PI*18*t))*t)*Math.exp(-t*15)*1.15,1.3)*.8); d[14].name='LASER';
+  d[15].buffer=makeBuffer(.42,t=>softClip((Math.sin(2*Math.PI*(145+45*Math.exp(-t*7))*t)*.72+(Math.random()*2-1)*.16)*Math.exp(-t*10)*1.25,1.4)*.84); d[15].name='FX TOM';
+  d.forEach((p,i)=>{p.decay=i===8?.85:(i===7||i===10?.55:.38); p.tone=(i===0||i===8)?.55:(i===1?.68:.86);});
 
   // BASS
   const bassNames=['SUB','ACID','PLUCK','REESE','FM BASS','MUTED','ROUND','DIRTY','LOW SAW','THUMP','GLIDE','BITE','DARK','PULSE','MONO','BASS FX'];
@@ -1417,66 +1476,44 @@ function seedBanks(){
   const synthFreqs=[220,261.6,329.6,440,293.7,392,246.9,523.3,349.2,277.2,311.1,369.9,466.2,261.6,415.3,587.3];
   banks[2].pads.forEach((p,i)=>{ p.buffer=synthTone(synthFreqs[i],synthStyles[i]); p.name=synthNames[i]; p.decay=0.95; p.tone=.78; });
 
-  // BRASS
-  const brassNames=['STAB','HORN','SOFT BR','FALL','BRIGHT','LOW BR','SHORT','FAT','MUTE','HIT','STACK','RIP','WIDE','BLAST','TRIO','PUNCH'];
-  const brassStyles=['stab','stab','soft','fall','bright','soft','stab','bright','soft','fall','stab','bright','soft','bright','stab','fall'];
-  const brassFreqs=[196,220,246.9,261.6,293.7,174.6,311.1,329.6,233.1,277.2,349.2,369.9,392,415.3,466.2,523.3];
-  banks[3].pads.forEach((p,i)=>{ p.buffer=brassTone(brassFreqs[i],brassStyles[i]); p.name=brassNames[i]; p.decay=0.7; p.tone=.68; });
-
-  // PERC
-  const p=banks[4].pads;
-  p[0].buffer=makeBuffer(.36,t=>Math.sin(2*Math.PI*220*t)*Math.exp(-t*8)); p[0].name='CONGA';
-  p[1].buffer=makeBuffer(.25,t=>Math.sin(2*Math.PI*320*t)*Math.exp(-t*10)); p[1].name='BONGO';
-  p[2].buffer=makeBuffer(.2,t=>((Math.random()*2-1)*.9)*Math.exp(-t*32)); p[2].name='SHAKER';
-  p[3].buffer=makeBuffer(.22,t=>(Math.sin(2*Math.PI*560*t)+.3*Math.sin(2*Math.PI*1120*t))*Math.exp(-t*20)); p[3].name='COWBELL';
-  p[4].buffer=makeBuffer(.14,t=>Math.sin(2*Math.PI*1500*t)*Math.exp(-t*35)); p[4].name='CLAVE';
-  p[5].buffer=makeBuffer(.18,t=>(Math.sin(2*Math.PI*700*t)+.4*Math.sin(2*Math.PI*980*t))*Math.exp(-t*24)); p[5].name='WOOD';
-  p[6].buffer=makeBuffer(.33,t=>((Math.random()*2-1)*.8)*Math.exp(-t*12)); p[6].name='TAMB';
-  p[7].buffer=makeBuffer(.28,t=>Math.sin(2*Math.PI*410*t)*Math.exp(-t*11)); p[7].name='GUIRO';
-  p[8].buffer=makeBuffer(.4,t=>Math.sin(2*Math.PI*180*t)*Math.exp(-t*7)); p[8].name='DJEMBE';
-  p[9].buffer=makeBuffer(.22,t=>((Math.random()*2-1)*.7+Math.sin(2*Math.PI*520*t)*.18)*Math.exp(-t*18)); p[9].name='CABASA';
-  p[10].buffer=makeBuffer(.1,t=>Math.sin(2*Math.PI*1280*t)*Math.exp(-t*44)); p[10].name='TICK';
-  p[11].buffer=makeBuffer(.16,t=>Math.sin(2*Math.PI*860*t)*Math.exp(-t*27)); p[11].name='AGOGO';
-  p[12].buffer=makeBuffer(.26,t=>Math.sin(2*Math.PI*260*t)*Math.exp(-t*9)); p[12].name='UDO';
-  p[13].buffer=makeBuffer(.18,t=>((Math.random()*2-1)*.85)*Math.exp(-t*22)); p[13].name='BRUSH';
-  p[14].buffer=makeBuffer(.24,t=>(Math.sin(2*Math.PI*480*t)+.25*Math.sin(2*Math.PI*720*t))*Math.exp(-t*14)); p[14].name='METAL';
-  p[15].buffer=makeBuffer(.3,t=>((Math.random()*2-1)*.6+Math.sin(2*Math.PI*260*t)*.2)*Math.exp(-t*15)); p[15].name='PERC FX';
+  // USER 1 + USER 2 are intentionally empty for recordings/imported samples.
+  // Existing sequencer data in these bank slots is preserved across upgrades.
 
 
-  // 808-style bank — original synthesized approximations
+  // 808-style bank — upgraded original analogue-style synthesis
   const e8=banks[5].pads;
   const e8names=['BD','SD','CH','OH','CP','RS','CL','CB','LT','MT','HT','LC','MC','HC','CY','MA'];
-  e8[0].buffer=makeBuffer(.9,t=>Math.sin(2*Math.PI*(95*Math.exp(-t*20)+43)*t)*Math.exp(-t*5.2));
-  e8[1].buffer=makeBuffer(.48,t=>(Math.sin(2*Math.PI*185*t)*.35+(Math.random()*2-1)*.58)*Math.exp(-t*12));
-  e8[2].buffer=makeBuffer(.11,t=>(Math.random()*2-1)*Math.exp(-t*55));
-  e8[3].buffer=makeBuffer(.58,t=>(Math.random()*2-1)*.8*Math.exp(-t*8));
-  e8[4].buffer=makeBuffer(.34,t=>((Math.random()*2-1)*.7+Math.sin(2*Math.PI*900*t)*.12)*Math.exp(-t*19));
-  e8[5].buffer=makeBuffer(.2,t=>Math.sin(2*Math.PI*520*t)*Math.exp(-t*24));
-  e8[6].buffer=makeBuffer(.14,t=>Math.sin(2*Math.PI*1700*t)*Math.exp(-t*34));
-  e8[7].buffer=makeBuffer(.22,t=>(Math.sin(2*Math.PI*540*t)+.55*Math.sin(2*Math.PI*800*t))*Math.exp(-t*17));
-  [118,150,185,215,265,315].forEach((f,j)=>e8[8+j].buffer=makeBuffer(.45,t=>Math.sin(2*Math.PI*(f*Math.exp(-t*3.2))*t)*Math.exp(-t*7)));
-  e8[14].buffer=makeBuffer(.75,t=>(Math.random()*2-1)*.75*Math.exp(-t*6));
-  e8[15].buffer=makeBuffer(.16,t=>Math.sin(2*Math.PI*760*t)*Math.exp(-t*26));
-  e8.forEach((p,i)=>{p.name='808 '+e8names[i];p.decay=i===0?.8:.45;p.tone=i<2?.55:.8;});
+  e8[0].buffer=makeBuffer(1.15,t=>{const f=43+115*Math.exp(-t*24);const body=Math.sin(2*Math.PI*f*t)*Math.exp(-t*4.3);const click=(Math.random()*2-1)*Math.exp(-t*110)*.09;return softClip((body+click)*1.55,1.8)*.96;});
+  e8[1].buffer=makeBuffer(.5,t=>{const n=(Math.random()*2-1)*.5*Math.exp(-t*13);const b=(Math.sin(2*Math.PI*185*t)*.34+Math.sin(2*Math.PI*310*t)*.13)*Math.exp(-t*10);return softClip((n+b)*1.35,1.45)*.88;});
+  e8[2].buffer=makeBuffer(.105,t=>softClip((Math.random()*2-1)*Math.exp(-t*58)*1.2,1.35)*.7);
+  e8[3].buffer=makeBuffer(.62,t=>softClip((Math.random()*2-1)*Math.exp(-t*7.5)*1.05,1.25)*.72);
+  e8[4].buffer=makeBuffer(.36,t=>{const n=(Math.random()*2-1),bursts=(Math.exp(-t*70)+.72*Math.exp(-Math.max(0,t-.018)*78)+.48*Math.exp(-Math.max(0,t-.035)*82));return softClip(n*bursts*.62*Math.exp(-t*5.3)*1.15,1.45)*.82;});
+  e8[5].buffer=makeBuffer(.16,t=>softClip((Math.sin(2*Math.PI*520*t)*.75+(Math.random()*2-1)*.12)*Math.exp(-t*30)*1.15,1.35)*.78);
+  e8[6].buffer=makeBuffer(.12,t=>softClip(Math.sin(2*Math.PI*1740*t)*Math.exp(-t*38)*1.1,1.3)*.72);
+  e8[7].buffer=makeBuffer(.24,t=>softClip((Math.sin(2*Math.PI*540*t)+.55*Math.sin(2*Math.PI*800*t))*Math.exp(-t*17)*.88,1.35)*.83);
+  [118,150,185,215,265,315].forEach((f,j)=>e8[8+j].buffer=makeBuffer(.52,t=>softClip((Math.sin(2*Math.PI*(f+55*Math.exp(-t*8))*t)+.10*Math.sin(2*Math.PI*f*2*t))*Math.exp(-t*6.8)*1.1,1.35)*.85));
+  e8[14].buffer=makeBuffer(.85,t=>{const n=(Math.random()*2-1);const m=.18*Math.sin(2*Math.PI*6200*t)+.15*Math.sin(2*Math.PI*8100*t);return softClip((n*.52+m)*Math.exp(-t*5.4)*1.1,1.2)*.76;});
+  e8[15].buffer=makeBuffer(.16,t=>softClip((Math.sin(2*Math.PI*760*t)+.2*Math.sin(2*Math.PI*1520*t))*Math.exp(-t*27),1.35)*.74);
+  e8.forEach((p,i)=>{p.name='808 '+e8names[i];p.decay=i===0?.95:(i===3||i===14?.62:.42);p.tone=i<2?.58:.84;});
 
-  // 909-style bank — original synthesized approximations
+  // 909-style bank — upgraded original punchy hybrid-style synthesis
   const e9=banks[6].pads;
   const e9names=['BD','SD','CH','OH','CP','RS','LT','MT','HT','CR','RD','CY','RIM','SN2','K2','FX'];
-  e9[0].buffer=makeBuffer(.62,t=>(Math.sin(2*Math.PI*(145*Math.exp(-t*24)+48)*t)+.12*(Math.random()*2-1))*Math.exp(-t*8));
-  e9[1].buffer=makeBuffer(.34,t=>(Math.sin(2*Math.PI*210*t)*.25+(Math.random()*2-1)*.78)*Math.exp(-t*18));
-  e9[2].buffer=makeBuffer(.09,t=>(Math.random()*2-1)*Math.exp(-t*72));
-  e9[3].buffer=makeBuffer(.42,t=>(Math.random()*2-1)*.9*Math.exp(-t*11));
-  e9[4].buffer=makeBuffer(.28,t=>((Math.random()*2-1)*.85+Math.sin(2*Math.PI*1100*t)*.12)*Math.exp(-t*25));
-  e9[5].buffer=makeBuffer(.12,t=>Math.sin(2*Math.PI*980*t)*Math.exp(-t*34));
-  [125,175,235].forEach((f,j)=>e9[6+j].buffer=makeBuffer(.28,t=>(Math.sin(2*Math.PI*f*t)+.15*Math.sin(2*Math.PI*f*1.5*t))*Math.exp(-t*11)));
-  e9[9].buffer=makeBuffer(.48,t=>(Math.random()*2-1)*.72*Math.exp(-t*8));
-  e9[10].buffer=makeBuffer(.65,t=>(Math.random()*2-1)*.58*Math.exp(-t*5.5));
-  e9[11].buffer=makeBuffer(.3,t=>(Math.random()*2-1)*.82*Math.exp(-t*15));
-  e9[12].buffer=makeBuffer(.09,t=>Math.sin(2*Math.PI*1550*t)*Math.exp(-t*43));
-  e9[13].buffer=makeBuffer(.25,t=>((Math.random()*2-1)*.65+Math.sin(2*Math.PI*245*t)*.2)*Math.exp(-t*22));
-  e9[14].buffer=makeBuffer(.42,t=>Math.sin(2*Math.PI*(175*Math.exp(-t*20)+55)*t)*Math.exp(-t*10));
-  e9[15].buffer=makeBuffer(.18,t=>((Math.random()*2-1)*.35+Math.sin(2*Math.PI*640*t)*.3)*Math.exp(-t*20));
-  e9.forEach((p,i)=>{p.name='909 '+e9names[i];p.decay=i===0?.55:.38;p.tone=i<2?.62:.88;});
+  e9[0].buffer=makeBuffer(.72,t=>{const f=50+145*Math.exp(-t*30);const body=Math.sin(2*Math.PI*f*t)*Math.exp(-t*7.0);const click=(Math.random()*2-1)*Math.exp(-t*95)*.16;return softClip((body+click)*1.65,1.8)*.96;});
+  e9[1].buffer=makeBuffer(.38,t=>{const n=(Math.random()*2-1)*.78*Math.exp(-t*18);const tone=(Math.sin(2*Math.PI*205*t)*.28+Math.sin(2*Math.PI*330*t)*.10)*Math.exp(-t*13);return softClip((n+tone)*1.25,1.45)*.9;});
+  e9[2].buffer=makeBuffer(.085,t=>softClip((Math.random()*2-1)*Math.exp(-t*78)*1.25,1.35)*.72);
+  e9[3].buffer=makeBuffer(.5,t=>softClip((Math.random()*2-1)*Math.exp(-t*10.5)*1.15,1.28)*.76);
+  e9[4].buffer=makeBuffer(.31,t=>{const n=(Math.random()*2-1),bursts=(Math.exp(-t*74)+.66*Math.exp(-Math.max(0,t-.016)*85)+.5*Math.exp(-Math.max(0,t-.033)*86));return softClip(n*bursts*.68*Math.exp(-t*5.5)*1.2,1.5)*.84;});
+  e9[5].buffer=makeBuffer(.105,t=>softClip((Math.sin(2*Math.PI*1200*t)*.72+(Math.random()*2-1)*.16)*Math.exp(-t*42),1.4)*.77);
+  [125,175,235].forEach((f,j)=>e9[6+j].buffer=makeBuffer(.34,t=>softClip((Math.sin(2*Math.PI*(f+70*Math.exp(-t*10))*t)+.16*Math.sin(2*Math.PI*f*1.52*t))*Math.exp(-t*10)*1.15,1.4)*.86));
+  e9[9].buffer=makeBuffer(.58,t=>softClip(((Math.random()*2-1)*.62+.16*Math.sin(2*Math.PI*5000*t))*Math.exp(-t*7.5)*1.2,1.3)*.78);
+  e9[10].buffer=makeBuffer(.78,t=>softClip(((Math.random()*2-1)*.48+.15*Math.sin(2*Math.PI*3600*t))*Math.exp(-t*5.2)*1.2,1.25)*.76);
+  e9[11].buffer=makeBuffer(.4,t=>softClip(((Math.random()*2-1)*.72+.14*Math.sin(2*Math.PI*7100*t))*Math.exp(-t*12)*1.15,1.3)*.78);
+  e9[12].buffer=makeBuffer(.095,t=>softClip((Math.sin(2*Math.PI*1580*t)+.16*(Math.random()*2-1))*Math.exp(-t*45),1.4)*.76);
+  e9[13].buffer=makeBuffer(.28,t=>softClip(((Math.random()*2-1)*.62+Math.sin(2*Math.PI*245*t)*.25)*Math.exp(-t*21)*1.2,1.45)*.84);
+  e9[14].buffer=makeBuffer(.52,t=>{const f=54+180*Math.exp(-t*32);return softClip((Math.sin(2*Math.PI*f*t)+(Math.random()*2-1)*.08)*Math.exp(-t*8.8)*1.55,1.8)*.94;});
+  e9[15].buffer=makeBuffer(.24,t=>softClip(((Math.random()*2-1)*.28+Math.sin(2*Math.PI*640*t)*.42)*Math.exp(-t*16)*1.2,1.4)*.8);
+  e9.forEach((p,i)=>{p.name='909 '+e9names[i];p.decay=i===0?.62:(i===3||i===9||i===10?.5:.36);p.tone=i<2?.65:.9;});
 
   // ACID bank — live oscillator voices, chromatic C2–D#3
   const acid=banks[7].pads;
@@ -1484,8 +1521,8 @@ function seedBanks(){
   const acidNames=['C2','C#2','D2','D#2','E2','F2','F#2','G2','G#2','A2','A#2','B2','C3','C#3','D3','D#3'];
   acid.forEach((p,i)=>{p.engine='acid';p.buffer=null;p.noteHz=acidFreq[i];p.name='ACID '+acidNames[i];p.tone=.46;p.decay=.34;p.attack=0;p.acidRes=.7;p.acidEnv=.72;p.acidGlide=.18;p.acidAccent=.3;p.acidWave='sawtooth';});
 
-  // USER remains empty
-  [0,1,2,3,4,5,6,7].forEach(bankIndex=>banks[bankIndex].pads.forEach(p=>{ if(!p.name) p.name='SOUND'; }));
+  // USER 1, USER 2 and USER 3 remain empty by default.
+  [0,1,2,5,6,7].forEach(bankIndex=>banks[bankIndex].pads.forEach(p=>{ if(!p.name) p.name='SOUND'; }));
   renderPads();
 }
 

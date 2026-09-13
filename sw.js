@@ -1,4 +1,4 @@
-const CACHE = 'ps16-overview-floating-fixed-v1';
+const CACHE = 'ps16-userbanks-v1';
 const ASSETS = [
   './',
   './index.html',
