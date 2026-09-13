@@ -1,4 +1,4 @@
-const CACHE = 'ps16-scene-fx-v1';
+const CACHE = 'ps16-scene-fx-sync-v2';
 const ASSETS = [
   './',
   './index.html',

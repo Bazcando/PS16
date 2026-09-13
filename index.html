@@ -119,6 +119,11 @@ html{scroll-behavior:smooth}
 .scene-btn.active small{color:#24180b}
 .scene-status{margin-top:10px;color:var(--muted);font-size:.67rem;text-align:center;min-height:1.2em}
 @media(max-width:620px){.scene-grid{grid-template-columns:repeat(2,1fr)}.scene-btn:last-child{grid-column:1/-1}}
+.scene-sync-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.scene-sync-grid label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.62rem}
+.scene-sync-grid select{background:#111;color:var(--ink);border:1px solid #3d3d3d;border-radius:8px;padding:8px;width:100%}
+@media(max-width:620px){.scene-sync-grid{grid-template-columns:repeat(2,1fr)}.scene-sync-grid label:last-child{grid-column:1/-1}}
+
 
   </style>
 </head>
@@ -249,6 +254,13 @@ html{scroll-behavior:smooth}
         <button class="scene-btn" data-scene="tape">TAPE STOP<small>drop + fade</small></button>
         <button class="scene-btn" data-scene="echo">ECHO THROW<small>big delay burst</small></button>
         <button class="scene-btn" data-scene="glitch">GLITCH<small>random chops</small></button>
+      </div>
+      <div class="scene-sync-grid">
+        <label>STUTTER<div><select id="sceneStutterDiv"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option></select></div></label>
+        <label>ECHO<div><select id="sceneEchoDiv"><option value="4">1/4</option><option value="8d">1/8 dotted</option><option value="8" selected>1/8</option><option value="16">1/16</option></select></div></label>
+        <label>FILTER<div><select id="sceneFilterBeats"><option value="1" selected>1 beat</option><option value="2">2 beats</option><option value="4">1 bar</option></select></div></label>
+        <label>TAPE<div><select id="sceneTapeBeats"><option value="1" selected>1 beat</option><option value="2">2 beats</option><option value="4">1 bar</option></select></div></label>
+        <label>GLITCH<div><select id="sceneGlitchDiv"><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option></select></div></label>
       </div>
       <div id="sceneStatus" class="scene-status">Hold an effect while the track is playing.</div>
     </section>
@@ -900,37 +912,53 @@ function clearSceneTimer(){ if(sceneTimer){ clearInterval(sceneTimer); sceneTime
 function currentMasterFilter(){ return +$('filter').value || 18000; }
 function currentDelayWet(){ return +$('delay').value || 0; }
 function currentFeedback(){ return +$('feedback').value || .25; }
+function quarterNoteSeconds(){ return 60/Math.max(40,Math.min(240,+$('bpm').value||120)); }
+function divisionSeconds(v){
+  const q=quarterNoteSeconds();
+  if(v==='8d') return q*.75;
+  const n=+v||16;
+  return q*(4/n);
+}
 function beginScene(name,btn){
-  if(!ctx) ensureAudio().then(()=>beginScene(name,btn));
-  if(!ctx || activeScene===name) return;
+  if(!ctx){ ensureAudio().then(()=>beginScene(name,btn)); return; }
+  if(activeScene===name) return;
   if(activeScene) endScene(activeScene);
   activeScene=name; clearSceneTimer();
   sceneSaved={filter:currentMasterFilter(),delay:currentDelayWet(),feedback:currentFeedback(),delayTime:delayNode?.delayTime.value||.25};
   document.querySelectorAll('.scene-btn').forEach(b=>b.classList.toggle('active',b===btn));
-  if($('sceneStatus')) $('sceneStatus').textContent=name.toUpperCase()+' ACTIVE';
   const now=ctx.currentTime;
-  try{ sceneGate.gain.cancelScheduledValues(now); sceneGate.gain.setValueAtTime(sceneGate.gain.value,now); }catch(e){}
+  try{ sceneGate.gain.cancelScheduledValues(now); sceneGate.gain.setValueAtTime(Math.max(.001,sceneGate.gain.value),now); }catch(e){}
   if(name==='filter'){
-    filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setValueAtTime(Math.max(350,sceneSaved.filter),now); filterNode.frequency.exponentialRampToValueAtTime(350,now+.45);
+    const beats=+$('sceneFilterBeats')?.value||1, dur=quarterNoteSeconds()*beats;
+    filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setValueAtTime(Math.max(350,sceneSaved.filter),now); filterNode.frequency.exponentialRampToValueAtTime(350,now+dur);
+    if($('sceneStatus')) $('sceneStatus').textContent=`FILTER DROP · ${beats===4?'1 BAR':beats+' BEAT'+(beats>1?'S':'')}`;
   }else if(name==='echo'){
-    const wet=$('delay')._wet; if(wet) wet.gain.setTargetAtTime(.82,now,.02); feedbackNode.gain.setTargetAtTime(.68,now,.02); delayNode.delayTime.setTargetAtTime(.28,now,.02);
+    const div=$('sceneEchoDiv')?.value||'8', t=divisionSeconds(div);
+    const wet=$('delay')._wet; if(wet) wet.gain.setTargetAtTime(.82,now,.01); feedbackNode.gain.setTargetAtTime(.68,now,.01); delayNode.delayTime.setTargetAtTime(t,now,.01);
+    if($('sceneStatus')) $('sceneStatus').textContent=`ECHO THROW · ${$('sceneEchoDiv')?.selectedOptions[0]?.textContent||'1/8'}`;
   }else if(name==='tape'){
-    sceneGate.gain.setValueAtTime(Math.max(.001,sceneGate.gain.value),now); sceneGate.gain.exponentialRampToValueAtTime(.015,now+.85);
-    filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setValueAtTime(Math.max(600,sceneSaved.filter),now); filterNode.frequency.exponentialRampToValueAtTime(280,now+.85);
+    const beats=+$('sceneTapeBeats')?.value||1, dur=quarterNoteSeconds()*beats;
+    sceneGate.gain.setValueAtTime(Math.max(.001,sceneGate.gain.value),now); sceneGate.gain.exponentialRampToValueAtTime(.015,now+dur);
+    filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setValueAtTime(Math.max(600,sceneSaved.filter),now); filterNode.frequency.exponentialRampToValueAtTime(280,now+dur);
+    if($('sceneStatus')) $('sceneStatus').textContent=`TAPE STOP · ${beats===4?'1 BAR':beats+' BEAT'+(beats>1?'S':'')}`;
   }else if(name==='stutter'){
-    let on=true; const interval=Math.max(45,secondsPerStep()*500);
-    sceneTimer=setInterval(()=>{ if(!ctx||activeScene!=='stutter')return; on=!on; sceneGate.gain.setTargetAtTime(on?1:.03,ctx.currentTime,.005); },interval);
+    const div=$('sceneStutterDiv')?.value||'16', interval=Math.max(20,divisionSeconds(div)*500);
+    let on=true;
+    sceneTimer=setInterval(()=>{ if(!ctx||activeScene!=='stutter')return; on=!on; sceneGate.gain.setTargetAtTime(on?1:.03,ctx.currentTime,.003); },interval);
+    if($('sceneStatus')) $('sceneStatus').textContent=`STUTTER · ${$('sceneStutterDiv')?.selectedOptions[0]?.textContent||'1/16'}`;
   }else if(name==='glitch'){
-    sceneTimer=setInterval(()=>{ if(!ctx||activeScene!=='glitch')return; const now=ctx.currentTime; sceneGate.gain.setTargetAtTime(Math.random()>.35?1:.03,now,.004); filterNode.frequency.setTargetAtTime(350+Math.random()*Math.max(700,sceneSaved.filter),now,.01); },70);
+    const div=$('sceneGlitchDiv')?.value||'16', interval=Math.max(20,divisionSeconds(div)*1000);
+    sceneTimer=setInterval(()=>{ if(!ctx||activeScene!=='glitch')return; const t=ctx.currentTime; sceneGate.gain.setTargetAtTime(Math.random()>.35?1:.03,t,.003); filterNode.frequency.setTargetAtTime(350+Math.random()*Math.max(700,sceneSaved.filter),t,.008); },interval);
+    if($('sceneStatus')) $('sceneStatus').textContent=`GLITCH · ${$('sceneGlitchDiv')?.selectedOptions[0]?.textContent||'1/16'}`;
   }
 }
 function endScene(name){
   if(!ctx || (name && activeScene!==name)) return;
   clearSceneTimer(); const now=ctx.currentTime;
   const saved=sceneSaved||{filter:currentMasterFilter(),delay:currentDelayWet(),feedback:currentFeedback(),delayTime:.25};
-  try{ sceneGate.gain.cancelScheduledValues(now); sceneGate.gain.setTargetAtTime(1,now,.025); }catch(e){}
-  try{ filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setTargetAtTime(Math.max(300,saved.filter),now,.035); }catch(e){}
-  try{ const wet=$('delay')._wet; if(wet) wet.gain.setTargetAtTime(saved.delay,now,.04); feedbackNode.gain.setTargetAtTime(saved.feedback,now,.04); delayNode.delayTime.setTargetAtTime(saved.delayTime,now,.04); }catch(e){}
+  try{ sceneGate.gain.cancelScheduledValues(now); sceneGate.gain.setTargetAtTime(1,now,.02); }catch(e){}
+  try{ filterNode.frequency.cancelScheduledValues(now); filterNode.frequency.setTargetAtTime(Math.max(300,saved.filter),now,.03); }catch(e){}
+  try{ const wet=$('delay')._wet; if(wet) wet.gain.setTargetAtTime(saved.delay,now,.03); feedbackNode.gain.setTargetAtTime(saved.feedback,now,.03); delayNode.delayTime.setTargetAtTime(saved.delayTime,now,.03); }catch(e){}
   activeScene=null; sceneSaved=null;
   document.querySelectorAll('.scene-btn').forEach(b=>b.classList.remove('active'));
   if($('sceneStatus')) $('sceneStatus').textContent='Hold an effect while the track is playing.';
