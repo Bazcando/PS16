@@ -140,6 +140,15 @@ html{scroll-behavior:smooth}
 .floating-transport:active{transform:scale(.96)}
 @media(max-width:520px){.floating-transport{right:14px;bottom:14px;width:64px;height:64px;font-size:1.45rem}}
 
+
+.track-overview{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:0 0 12px}
+.track-chip{position:relative;min-height:42px;padding:5px 4px;border-radius:8px;background:#252525;color:#777;border:1px solid #383838;font-size:.62rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.track-chip.programmed{color:#111;background:var(--track-color);border-color:var(--track-color);box-shadow:0 0 8px color-mix(in srgb,var(--track-color) 28%,transparent)}
+.track-chip.selected{outline:2px solid var(--accent2)}
+.track-chip.playing-now{filter:brightness(1.55);transform:scale(.96);box-shadow:0 0 14px var(--track-color)}
+.track-chip .track-num{font-weight:800;font-size:.72rem}
+.track-chip .track-count{font-size:.52rem;opacity:.8}
+@media(max-width:520px){.track-overview{grid-template-columns:repeat(8,1fr);gap:4px}.track-chip{min-height:38px;padding:3px 2px}}
 </style>
 </head>
 <body>
@@ -212,6 +221,7 @@ html{scroll-behavior:smooth}
 
     <section id="seqSection" class="panel">
       <div class="section-head"><h2>SEQUENCER</h2><span>steps match selected pad colour</span></div>
+      <div id="trackOverview" class="track-overview" aria-label="Programmed pad overview"></div>
       <div id="steps" class="steps"></div>
       <div class="lock-editor">
         <strong id="stepLockLabel">STEP LOCKS · long-press a step</strong>
@@ -710,7 +720,24 @@ function syncControls(){
   ['acidRes','acidEnv','acidGlide','acidAccent'].forEach(id=>{if($(id)){ $(id).value=p[id]; updateKnob(id); }});
   if($('acidWave')) $('acidWave').textContent='WAVE: '+(p.acidWave==='square'?'SQUARE':'SAW');
 }
+
+function renderTrackOverview(){
+  const wrap=$('trackOverview'); if(!wrap) return;
+  wrap.innerHTML='';
+  const bank=banks[selectedBank];
+  bank.pads.forEach((p,i)=>{
+    const count=p.steps.filter(Boolean).length;
+    const b=document.createElement('button');
+    b.className='track-chip'+(count?' programmed':'')+(i===selectedPad?' selected':'');
+    b.dataset.trackPad=i;
+    b.style.setProperty('--track-color',padColor(selectedBank,i));
+    b.innerHTML=`<span class="track-num">${String(i+1).padStart(2,'0')}</span><span class="track-count">${count?count+' HIT'+(count===1?'':'S'):'EMPTY'}</span>`;
+    b.addEventListener('click',()=>selectPad(i));
+    wrap.appendChild(b);
+  });
+}
 function renderSteps(){
+  renderTrackOverview();
   const color=padColor(selectedBank,selectedPad);
   document.querySelectorAll('.step').forEach((el,i)=>{
     el.style.setProperty('--step-color',color);
@@ -742,8 +769,10 @@ function renderPitchLockEditor(){
 }
 function flashPad(bankIndex,padIndex){
   if(bankIndex!==selectedBank) return;
-  const el=document.querySelector(`.pad[data-pad="${padIndex}"]`); if(!el) return;
-  el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),80);
+  const el=document.querySelector(`.pad[data-pad="${padIndex}"]`);
+  if(el){ el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),90); }
+  const chip=document.querySelector(`.track-chip[data-track-pad="${padIndex}"]`);
+  if(chip){ chip.classList.add('playing-now'); setTimeout(()=>chip.classList.remove('playing-now'),110); }
 }
 
 
