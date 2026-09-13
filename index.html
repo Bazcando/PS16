@@ -339,6 +339,8 @@ html{scroll-behavior:smooth}
     <footer>Includes original 808/909-style drum synthesis and a live ACID monosynth bank with resonance, envelope, glide and accent.</footer>
   </main>
 
+  <button id="floatingTransport" class="floating-transport" aria-label="Play sequence" title="Play / Stop">▶</button>
+
 <script>
 const NUM_PADS=16, NUM_STEPS=16;
 const BANK_DEFS=[
@@ -1015,7 +1017,6 @@ function scheduler(){
   }
   timer=setTimeout(scheduler,lookahead);
 }
-
 function updateFloatingTransport(){
   const b=$('floatingTransport'); if(!b) return;
   b.textContent=playing?'■':'▶';
@@ -1033,7 +1034,7 @@ async function play(){
 }
 function stop(){ playing=false; updateFloatingTransport(); if(timer) clearTimeout(timer); timer=null; currentStep=0; sequenceStep=0; barsScheduled=0; $('statusText').textContent='stopped'; $('statusDot').parentElement.classList.remove('running'); saveCurrentPattern(); renderSteps(); renderPatternUI(); }
 
-$('audioBtn').onclick=ensureAudio; $('playBtn').onclick=play; $('stopBtn').onclick=stop; $('floatingTransport').onclick=()=>playing?stop():play();
+$('audioBtn').onclick=ensureAudio; $('playBtn').onclick=play; $('stopBtn').onclick=stop; if($('floatingTransport')) $('floatingTransport').onclick=()=>playing?stop():play();
 $('copyNextPattern').onclick=()=>{
   saveCurrentPattern();
   const next=(selectedPattern+1)%NUM_PATTERNS;
@@ -1624,8 +1625,5 @@ if('serviceWorker' in navigator){
 }
 
 </script>
-
-  <button id="floatingTransport" class="floating-transport" aria-label="Play sequence" title="Play / Stop">▶</button>
-
 </body>
 </html>
