@@ -1,4 +1,4 @@
-const CACHE = 'ps16-v2026-09-13-1';
+const CACHE = 'ps16-v7-persistence';
 const ASSETS = [
   './',
   './index.html',

@@ -203,6 +203,15 @@ footer{text-align:center;color:#777;font-size:.7rem;margin-top:16px;line-height:
 
 
     <section class="panel controls">
+      <div class="section-head"><h2>PROJECT</h2><span id="saveStatus">autosave ready</span></div>
+      <div class="button-row">
+        <button id="saveProjectNow">SAVE NOW</button>
+        <button id="clearSavedProject">CLEAR SAVED PROJECT</button>
+      </div>
+      <div class="small-note">Patterns, chain, pitch locks, pad settings and mic/imported samples are saved on this device automatically.</div>
+    </section>
+
+    <section class="panel controls">
       <div class="section-head"><h2>SAMPLE LIBRARIES</h2><span>find sounds online</span></div>
       <div class="button-row">
         <a class="file-label" href="https://samplefocus.com/" target="_blank" rel="noopener noreferrer">SAMPLE FOCUS</a>
@@ -230,7 +239,7 @@ const BANK_DEFS=[
 ];
 
 function newPad(i){
-  return {buffer:null,name:`PAD ${i+1}`,volume:1,pitch:0,start:0,end:1,wobble:0,trem:0,grit:0,space:0,pan:0,tone:.85,attack:0,decay:1,engine:null,noteHz:55,acidRes:.65,acidEnv:.7,acidGlide:.2,acidAccent:.35,acidWave:'sawtooth',steps:Array(NUM_STEPS).fill(false),pitchLocks:Array(NUM_STEPS).fill(null)};
+  return {buffer:null,name:`PAD ${i+1}`,volume:1,pitch:0,start:0,end:1,wobble:0,trem:0,grit:0,space:0,pan:0,tone:.85,attack:0,decay:1,engine:null,noteHz:55,acidRes:.65,acidEnv:.7,acidGlide:.2,acidAccent:.35,acidWave:'sawtooth',sourceBlob:null,steps:Array(NUM_STEPS).fill(false),pitchLocks:Array(NUM_STEPS).fill(null)};
 }
 const banks=BANK_DEFS.map((b)=>({name:b.name,hue:b.hue,pads:Array.from({length:NUM_PADS},(_,i)=>newPad(i))}));
 let ctx=null, master=null, filterNode=null, driveNode=null, delayNode=null, feedbackNode=null, dryNode=null;
@@ -245,6 +254,109 @@ const activeVoices=[];
 const MAX_VOICES=28;
 const $=id=>document.getElementById(id);
 const padWrap=$('pads'), stepWrap=$('steps'), bankStrip=$('bankStrip');
+
+const PROJECT_KEY='ps16-project-v2';
+const DB_NAME='ps16-audio-v1';
+const DB_STORE='samples';
+let saveTimer=null, projectMetaLoaded=false, audioBlobsLoaded=false;
+
+function setSaveStatus(text){ const el=$('saveStatus'); if(el) el.textContent=text; }
+function scheduleAutoSave(){
+  if(saveTimer) clearTimeout(saveTimer);
+  setSaveStatus('saving…');
+  saveTimer=setTimeout(()=>saveProject(false),500);
+}
+function serialisePad(p){
+  return {
+    name:p.name, volume:p.volume, pitch:p.pitch, start:p.start, end:p.end,
+    wobble:p.wobble, trem:p.trem, grit:p.grit, space:p.space, pan:p.pan, tone:p.tone,
+    attack:p.attack, decay:p.decay, engine:p.engine, noteHz:p.noteHz,
+    acidRes:p.acidRes, acidEnv:p.acidEnv, acidGlide:p.acidGlide, acidAccent:p.acidAccent, acidWave:p.acidWave,
+    steps:p.steps.slice(), pitchLocks:p.pitchLocks.slice(), hasCustomAudio:!!p.sourceBlob
+  };
+}
+function makeProjectState(){
+  saveCurrentPattern();
+  return {
+    version:2, savedAt:Date.now(), selectedBank, selectedPad, selectedPattern,
+    chain:chain.slice(), chainMode, chainPosition,
+    bpm:+$('bpm').value||120, swing:+$('swing').value||0,
+    master:{filter:+$('filter').value,delay:+$('delay').value,feedback:+$('feedback').value,drive:+$('drive').value},
+    patterns:patterns.map(x=>x?JSON.parse(JSON.stringify(x)):null),
+    banks:banks.map(bank=>bank.pads.map(serialisePad))
+  };
+}
+function applyProjectState(state){
+  if(!state || !state.banks) return false;
+  try{
+    state.banks.forEach((padList,bi)=>padList?.forEach((saved,pi)=>{
+      const p=banks[bi]?.pads?.[pi]; if(!p||!saved) return;
+      const keepBuffer=p.buffer, keepBlob=p.sourceBlob;
+      Object.assign(p,saved);
+      p.buffer=keepBuffer; p.sourceBlob=keepBlob;
+      p.steps=(saved.steps||Array(NUM_STEPS).fill(false)).slice();
+      p.pitchLocks=(saved.pitchLocks||Array(NUM_STEPS).fill(null)).slice();
+    }));
+    if(Array.isArray(state.patterns)) state.patterns.forEach((p,i)=>patterns[i]=p?JSON.parse(JSON.stringify(p)):null);
+    selectedPattern=Math.max(0,Math.min(NUM_PATTERNS-1,state.selectedPattern||0));
+    selectedBank=Math.max(0,Math.min(banks.length-1,state.selectedBank||0));
+    selectedPad=Math.max(0,Math.min(NUM_PADS-1,state.selectedPad||0));
+    chain=Array.isArray(state.chain)?state.chain.filter(x=>Number.isInteger(x)&&x>=0&&x<NUM_PATTERNS):[];
+    chainMode=!!state.chainMode; chainPosition=Math.max(0,Math.min(chain.length-1,state.chainPosition||0));
+    if(state.bpm) $('bpm').value=state.bpm; if(state.swing!==undefined) $('swing').value=state.swing;
+    if(state.master){ ['filter','delay','feedback','drive'].forEach(id=>{if(state.master[id]!==undefined) $(id).value=state.master[id];}); }
+    if(patterns[selectedPattern]) restoreSteps(patterns[selectedPattern]);
+    selectBank(selectedBank); selectPad(selectedPad); renderPatternUI();
+    projectMetaLoaded=true; return true;
+  }catch(err){ console.error('Project restore failed',err); return false; }
+}
+function loadProjectMeta(){
+  try{ const raw=localStorage.getItem(PROJECT_KEY); if(!raw) return false; return applyProjectState(JSON.parse(raw)); }
+  catch(err){ console.error(err); return false; }
+}
+function openAudioDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=()=>{ if(!req.result.objectStoreNames.contains(DB_STORE)) req.result.createObjectStore(DB_STORE); };
+    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  });
+}
+async function dbPut(key,value){ const db=await openAudioDB(); return new Promise((res,rej)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(value,key);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>{db.close();rej(tx.error)}}); }
+async function dbGet(key){ const db=await openAudioDB(); return new Promise((res,rej)=>{const tx=db.transaction(DB_STORE,'readonly');const q=tx.objectStore(DB_STORE).get(key);q.onsuccess=()=>{db.close();res(q.result)};q.onerror=()=>{db.close();rej(q.error)}}); }
+async function dbDelete(key){ const db=await openAudioDB(); return new Promise((res,rej)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete(key);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>{db.close();rej(tx.error)}}); }
+async function dbClear(){ const db=await openAudioDB(); return new Promise((res,rej)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).clear();tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>{db.close();rej(tx.error)}}); }
+function sampleKey(bi,pi){ return `b${bi}-p${pi}`; }
+async function saveCustomAudio(){
+  const jobs=[];
+  banks.forEach((bank,bi)=>bank.pads.forEach((p,pi)=>{
+    if(p.sourceBlob) jobs.push(dbPut(sampleKey(bi,pi),p.sourceBlob));
+  }));
+  await Promise.all(jobs);
+}
+async function restoreCustomAudio(){
+  if(!ctx || audioBlobsLoaded) return;
+  audioBlobsLoaded=true;
+  for(let bi=0;bi<banks.length;bi++) for(let pi=0;pi<NUM_PADS;pi++){
+    const p=banks[bi].pads[pi];
+    try{
+      const blob=await dbGet(sampleKey(bi,pi));
+      if(blob){
+        const ab=await blob.arrayBuffer(); p.buffer=await ctx.decodeAudioData(ab.slice(0)); p.sourceBlob=blob; p.engine=null;
+      }
+    }catch(err){ console.warn('Sample restore failed',bi,pi,err); }
+  }
+  renderPads(); updateSelectedLabel(); syncControls();
+}
+async function saveProject(showStatus=true){
+  try{
+    localStorage.setItem(PROJECT_KEY,JSON.stringify(makeProjectState()));
+    await saveCustomAudio();
+    setSaveStatus('saved ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  }catch(err){ console.error(err); setSaveStatus('save failed'); if(showStatus) alert('PS-16 could not save the project on this device.'); }
+}
+async function clearSavedProject(){
+  localStorage.removeItem(PROJECT_KEY); await dbClear(); setSaveStatus('saved project cleared');
+}
 
 function currentPadObj(){ return banks[selectedBank].pads[selectedPad]; }
 function bankColor(bankIndex){ return `hsl(${banks[bankIndex].hue} 82% 58%)`; }
@@ -398,6 +510,8 @@ async function ensureAudio(){
     master.connect(ctx.destination);
     $('delay')._wet=wet;
     seedBanks();
+    if(projectMetaLoaded) loadProjectMeta();
+    await restoreCustomAudio();
   }
   if(ctx.state==='suspended') await ctx.resume();
   $('audioBtn').textContent='AUDIO ON';
@@ -781,10 +895,10 @@ async function beginMicRecording(){
         const ab=await blob.arrayBuffer();
         const buf=await ctx.decodeAudioData(ab.slice(0));
         const p=currentPadObj();
-        p.buffer=buf; p.engine=null; p.name='MIC '+String(selectedPad+1).padStart(2,'0'); p.start=0; p.end=1;
+        p.buffer=buf; p.sourceBlob=blob; p.engine=null; p.name='MIC '+String(selectedPad+1).padStart(2,'0'); p.start=0; p.end=1;
         renderPads(); updateSelectedLabel(); syncControls();
         setMicStatus(buf.duration.toFixed(1)+'s captured');
-        auditionSelected(50);
+        auditionSelected(50); scheduleAutoSave();
       }catch(err){
         console.error(err); setMicStatus('decode failed');
         alert('The recording was captured but could not be decoded by this browser.');
@@ -844,10 +958,10 @@ micBtn.addEventListener('contextmenu',e=>e.preventDefault());
 $('sampleFile').addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return; await ensureAudio();
   const ab=await f.arrayBuffer(); const buf=await ctx.decodeAudioData(ab.slice(0));
-  const p=currentPadObj(); p.buffer=buf; p.engine=null; p.name=f.name.replace(/\.[^.]+$/,''); p.start=0; p.end=1;
-  renderPads(); updateSelectedLabel(); syncControls(); e.target.value='';
+  const p=currentPadObj(); p.buffer=buf; p.sourceBlob=f; p.engine=null; p.name=f.name.replace(/\.[^.]+$/,''); p.start=0; p.end=1;
+  renderPads(); updateSelectedLabel(); syncControls(); scheduleAutoSave(); e.target.value='';
 });
-$('clearSample').onclick=()=>{ const p=currentPadObj(); if(p.engine==='acid') return; p.buffer=null; p.name=`PAD ${selectedPad+1}`; renderPads(); updateSelectedLabel(); };
+$('clearSample').onclick=async()=>{ const p=currentPadObj(); if(p.engine==='acid') return; p.buffer=null; p.sourceBlob=null; p.name=`PAD ${selectedPad+1}`; await dbDelete(sampleKey(selectedBank,selectedPad)); renderPads(); updateSelectedLabel(); scheduleAutoSave(); };
 $('stepPitchLock').addEventListener('input',e=>{
   if(selectedLockStep===null) return;
   currentPadObj().pitchLocks[selectedLockStep]=+e.target.value;
@@ -1033,7 +1147,20 @@ function seedBanks(){
   renderPads();
 }
 
+document.addEventListener('input',e=>{ if(e.target?.id!=='micRecord') scheduleAutoSave(); });
+document.addEventListener('change',scheduleAutoSave);
+document.addEventListener('click',e=>{
+  if(e.target?.closest?.('.pad') || e.target?.id==='playBtn' || e.target?.id==='stopBtn' || e.target?.id==='audioBtn' || e.target?.id==='installBtn') return;
+  scheduleAutoSave();
+});
+window.addEventListener('pagehide',()=>{ try{localStorage.setItem(PROJECT_KEY,JSON.stringify(makeProjectState()));}catch(_){} });
+$('saveProjectNow').addEventListener('click',()=>saveProject(true));
+$('clearSavedProject').addEventListener('click',async()=>{
+  if(confirm('Clear the saved PS-16 project from this device? The current open project will stay until you refresh.')) await clearSavedProject();
+});
+
 initUI();
+loadProjectMeta();
 
 let deferredInstallPrompt=null;
 const installBtn=document.getElementById('installBtn');
