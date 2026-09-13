@@ -1,4 +1,4 @@
-const CACHE = 'ps16-snapmix-v1';
+const CACHE = 'ps16-export-v7-oneshot';
 const ASSETS = [
   './',
   './index.html',
