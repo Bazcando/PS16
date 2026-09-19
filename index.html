@@ -90,9 +90,20 @@ footer{text-align:center;color:#777;font-size:.7rem;margin-top:16px;line-height:
 /* SNAP PAGES + LIVE MIX */
 html{scroll-behavior:smooth}
 @media(max-width:760px){
-  html,body{scroll-snap-type:y mandatory}
-  .panel{scroll-snap-align:start;scroll-snap-stop:always;scroll-margin-top:10px}
-  .topbar{scroll-snap-align:start}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{min-height:0}
+  .shell{height:100dvh;max-height:100dvh;overflow-y:auto;overflow-x:hidden;
+    scroll-snap-type:y mandatory;scroll-behavior:smooth;overscroll-behavior-y:contain;
+    scroll-padding-top:58px;padding-bottom:22px}
+  .topbar{scroll-snap-align:start;scroll-snap-stop:always}
+  .panel{scroll-snap-align:start;scroll-snap-stop:always;scroll-margin-top:58px;
+    min-height:calc(100dvh - 76px);border:2px solid #373737;border-radius:20px;
+    box-shadow:0 12px 30px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.025)}
+  .panel>.section-head{position:sticky;top:50px;z-index:8;
+    background:linear-gradient(180deg,#202020 76%,rgba(32,32,32,.82));
+    margin:-2px -2px 12px;padding:12px 2px 10px;border-bottom:1px solid #363636}
+  .transport.panel{min-height:auto}
+  .snap-nav{top:4px}
 }
 .snap-nav{position:sticky;top:6px;z-index:40;display:flex;gap:6px;overflow-x:auto;padding:6px;margin:0 -2px 4px;background:rgba(17,17,17,.86);backdrop-filter:blur(10px);border-radius:12px;scrollbar-width:none}
 .snap-nav::-webkit-scrollbar{display:none}
@@ -102,14 +113,14 @@ html{scroll-behavior:smooth}
 .mix-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:.72rem;font-weight:800}
 .mix-led{width:9px;height:9px;border-radius:50%;background:#454545;flex:none;transition:filter .06s,background .06s}
 .mix-led.on{background:var(--ch-color,#6bd36b);box-shadow:0 0 10px var(--ch-color,#6bd36b)}
-.mix-fader{height:112px;display:flex;justify-content:center;align-items:center}
-.mix-fader input{width:104px;transform:rotate(-90deg);accent-color:var(--ch-color,#f08a24)}
+.mix-fader{height:132px;display:flex;justify-content:center;align-items:center;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+.mix-fader input{width:30px;height:118px;transform:none;writing-mode:vertical-lr;direction:rtl;accent-color:var(--ch-color,#f08a24);touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;cursor:ns-resize}
 .mix-db{text-align:center;color:var(--muted);font-size:.62rem}
 .mix-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px}
 .mix-buttons button{padding:7px 4px;font-size:.62rem}
 .mix-buttons .active{background:var(--ch-color,#f08a24);color:#111;border-color:var(--ch-color,#f08a24)}
 .mix-master-note{margin-top:10px;color:var(--muted);font-size:.67rem;line-height:1.35}
-@media(max-width:520px){.mixer-grid{grid-template-columns:repeat(3,1fr);gap:7px}.mix-strip{padding:8px}.mix-fader{height:102px}.mix-fader input{width:94px}}
+@media(max-width:520px){.mixer-grid{grid-template-columns:repeat(3,1fr);gap:7px}.mix-strip{padding:8px}.mix-fader{height:126px}.mix-fader input{width:32px;height:112px}}
 
 /* SCENE FX */
 .scene-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
@@ -959,6 +970,7 @@ function renderMixer(){
     grid.appendChild(strip);
   });
   grid.querySelectorAll('[data-mix-level]').forEach(el=>el.addEventListener('input',e=>{const i=+e.target.dataset.mixLevel;mixer[i].volume=+e.target.value;const db=$('mixDb'+i);if(db)db.textContent=mixDb(mixer[i].volume);updateMixerAudio();scheduleAutoSave();}));
+  grid.querySelectorAll('[data-mix-level]').forEach(el=>{el.addEventListener('pointerdown',e=>{try{el.setPointerCapture(e.pointerId)}catch(_){};e.stopPropagation();});el.addEventListener('pointermove',e=>e.stopPropagation());});
   grid.querySelectorAll('[data-mute]').forEach(el=>el.addEventListener('click',e=>{const i=+e.currentTarget.dataset.mute;mixer[i].mute=!mixer[i].mute;renderMixer();updateMixerAudio();scheduleAutoSave();}));
   grid.querySelectorAll('[data-solo]').forEach(el=>el.addEventListener('click',e=>{const i=+e.currentTarget.dataset.solo;mixer[i].solo=!mixer[i].solo;renderMixer();updateMixerAudio();scheduleAutoSave();}));
 }

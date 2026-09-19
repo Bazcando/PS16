@@ -1,4 +1,4 @@
-const CACHE = 'ps16-userbanks-v1';
+const CACHE = 'ps16-layout-lock-v1';
 const ASSETS = [
   './',
   './index.html',
