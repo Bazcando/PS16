@@ -173,6 +173,7 @@ html{scroll-behavior:smooth}
 
 /* Compact accordion layout */
 html{scroll-snap-type:none!important}
+.shell{scroll-snap-type:none!important;scroll-behavior:auto!important;overscroll-behavior-y:auto!important}
 .panel{scroll-snap-align:none!important;min-height:0!important}
 .panel>.section-head{position:relative!important;top:auto!important;cursor:pointer;user-select:none;margin-bottom:0!important;padding:2px 0}
 .panel>.section-head::after{content:"▾";margin-left:auto;color:var(--accent2);font-size:1rem;transition:transform .18s ease}
@@ -1577,7 +1578,6 @@ $('clearSavedProject').addEventListener('click',async()=>{
 
 $('resetMix').onclick=resetMix;
 $('clearSolos').onclick=()=>{mixer.forEach(ch=>ch.solo=false);renderMixer();updateMixerAudio();scheduleAutoSave();};
-document.querySelectorAll('[data-jump]').forEach(btn=>btn.addEventListener('click',()=>{const el=$(btn.dataset.jump);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}));
 renderMixer();
 
 

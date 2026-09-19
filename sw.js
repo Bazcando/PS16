@@ -1,4 +1,4 @@
-const CACHE = 'ps16-collapsible-v1';
+const CACHE = 'ps16-collapsible-v2-scrollfix';
 const ASSETS = [
   './',
   './index.html',
