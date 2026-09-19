@@ -179,7 +179,7 @@ html{scroll-behavior:smooth}
         <div class="eyebrow">POCKET SAMPLER</div>
         <h1>PS-16</h1>
       </div>
-      <div style="display:flex;gap:8px;align-items:center"><button id="installBtn" class="pill" hidden>INSTALL</button><button id="audioBtn" class="pill">ENABLE AUDIO</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><button id="installBtn" class="pill" hidden>INSTALL</button></div>
     </header>
 
     <nav class="snap-nav" aria-label="Groovebox sections">
@@ -239,6 +239,22 @@ html{scroll-behavior:smooth}
       <div class="button-row"><button id="applyScale">APPLY TO ACID PADS</button></div>
       <div class="small-note">Remaps all 16 ACID pads to notes in the chosen scale, starting around C2. Great for fast melodic sequencing.</div>
     </section>
+
+    <section id="acidPanel" class="panel controls acid-panel">
+      <div class="section-head"><h2>ACID ENGINE</h2><span>303-style monosynth</span></div>
+      <div class="acid-grid acid-303-grid">
+        <label class="knob-wrap">TUNE<div class="knob"><input id="acidTune" type="range" min="-12" max="12" value="0" step="1"></div><span class="knob-value" id="acidTuneVal">0 st</span></label>
+        <label class="knob-wrap">CUTOFF<div class="knob"><input id="acidCutoff" type="range" min="0" max="1" value="0.46" step="0.01"></div><span class="knob-value" id="acidCutoffVal">46%</span></label>
+        <label class="knob-wrap">RESONANCE<div class="knob"><input id="acidRes" type="range" min="0" max="1" value="0.65" step="0.01"></div><span class="knob-value" id="acidResVal">65%</span></label>
+        <label class="knob-wrap">ENV MOD<div class="knob"><input id="acidEnv" type="range" min="0" max="1" value="0.7" step="0.01"></div><span class="knob-value" id="acidEnvVal">70%</span></label>
+        <label class="knob-wrap">DECAY<div class="knob"><input id="acidDecay" type="range" min="0.05" max="2.5" value="0.34" step="0.01"></div><span class="knob-value" id="acidDecayVal">0.34 s</span></label>
+        <label class="knob-wrap">ACCENT<div class="knob"><input id="acidAccent" type="range" min="0" max="1" value="0.35" step="0.01"></div><span class="knob-value" id="acidAccentVal">35%</span></label>
+        <label class="knob-wrap">GLIDE<div class="knob"><input id="acidGlide" type="range" min="0" max="1" value="0.2" step="0.01"></div><span class="knob-value" id="acidGlideVal">20%</span></label>
+      </div>
+      <div class="button-row"><button id="acidWave" class="acid-wave">WAVE: SAW</button></div>
+      <div class="small-note">Dedicated acid controls: Tune transposes the selected note, Cutoff shapes the filter, and Decay controls the acid envelope. Wobble and Grit still work as extra performance colour.</div>
+    </section>
+
 
     <section id="seqSection" class="panel">
       <div class="section-head"><h2>SEQUENCER</h2><span>steps match selected pad colour</span></div>
@@ -323,21 +339,6 @@ html{scroll-behavior:smooth}
         <label class="knob-wrap">ATTACK<div class="knob"><input id="attack" type="range" min="0" max="1.5" value="0" step="0.01"></div><span class="knob-value" id="attackVal">0 ms</span></label>
         <label class="knob-wrap">DECAY<div class="knob"><input id="decay" type="range" min="0.03" max="3" value="1" step="0.01"></div><span class="knob-value" id="decayVal">1.00 s</span></label>
       </div>
-    </section>
-
-    <section id="acidPanel" class="panel controls acid-panel">
-      <div class="section-head"><h2>ACID ENGINE</h2><span>303-style monosynth</span></div>
-      <div class="acid-grid acid-303-grid">
-        <label class="knob-wrap">TUNE<div class="knob"><input id="acidTune" type="range" min="-12" max="12" value="0" step="1"></div><span class="knob-value" id="acidTuneVal">0 st</span></label>
-        <label class="knob-wrap">CUTOFF<div class="knob"><input id="acidCutoff" type="range" min="0" max="1" value="0.46" step="0.01"></div><span class="knob-value" id="acidCutoffVal">46%</span></label>
-        <label class="knob-wrap">RESONANCE<div class="knob"><input id="acidRes" type="range" min="0" max="1" value="0.65" step="0.01"></div><span class="knob-value" id="acidResVal">65%</span></label>
-        <label class="knob-wrap">ENV MOD<div class="knob"><input id="acidEnv" type="range" min="0" max="1" value="0.7" step="0.01"></div><span class="knob-value" id="acidEnvVal">70%</span></label>
-        <label class="knob-wrap">DECAY<div class="knob"><input id="acidDecay" type="range" min="0.05" max="2.5" value="0.34" step="0.01"></div><span class="knob-value" id="acidDecayVal">0.34 s</span></label>
-        <label class="knob-wrap">ACCENT<div class="knob"><input id="acidAccent" type="range" min="0" max="1" value="0.35" step="0.01"></div><span class="knob-value" id="acidAccentVal">35%</span></label>
-        <label class="knob-wrap">GLIDE<div class="knob"><input id="acidGlide" type="range" min="0" max="1" value="0.2" step="0.01"></div><span class="knob-value" id="acidGlideVal">20%</span></label>
-      </div>
-      <div class="button-row"><button id="acidWave" class="acid-wave">WAVE: SAW</button></div>
-      <div class="small-note">Dedicated acid controls: Tune transposes the selected note, Cutoff shapes the filter, and Decay controls the acid envelope. Wobble and Grit still work as extra performance colour.</div>
     </section>
 
     <section id="fxSection" class="panel controls">
@@ -640,7 +641,7 @@ function initUI(){
     b.addEventListener('pointerdown',()=>{pressTimer=setTimeout(()=>selectPad(i),450)});
     b.addEventListener('pointerup',()=>clearTimeout(pressTimer));
     b.addEventListener('pointerleave',()=>clearTimeout(pressTimer));
-    b.addEventListener('click',()=>{selectPad(i);triggerPad(selectedBank,i,ctx?.currentTime||0,true)});
+    b.addEventListener('click',async()=>{selectPad(i);await ensureAudio();triggerPad(selectedBank,i,ctx.currentTime+.01,true)});
     padWrap.appendChild(b);
   }
 
@@ -709,7 +710,6 @@ async function ensureAudio(){
     renderPads(); updateSelectedLabel(); syncControls();
   }
   if(ctx.state==='suspended') await ctx.resume();
-  $('audioBtn').textContent='AUDIO ON';
 }
 
 function selectBank(i){
@@ -1097,7 +1097,7 @@ async function play(){
 }
 function stop(){ playing=false; updateFloatingTransport(); if(timer) clearTimeout(timer); timer=null; currentStep=0; sequenceStep=0; barsScheduled=0; $('statusText').textContent='stopped'; $('statusDot').parentElement.classList.remove('running'); saveCurrentPattern(); renderSteps(); renderPatternUI(); }
 
-$('audioBtn').onclick=ensureAudio; $('playBtn').onclick=play; $('stopBtn').onclick=stop; if($('floatingTransport')) $('floatingTransport').onclick=()=>playing?stop():play();
+$('playBtn').onclick=play; $('stopBtn').onclick=stop; if($('floatingTransport')) $('floatingTransport').onclick=()=>playing?stop():play();
 $('copyNextPattern').onclick=()=>{
   saveCurrentPattern();
   const next=(selectedPattern+1)%NUM_PATTERNS;
@@ -1541,7 +1541,7 @@ function seedBanks(){
 document.addEventListener('input',e=>{ if(e.target?.id!=='micRecord') scheduleAutoSave(); });
 document.addEventListener('change',scheduleAutoSave);
 document.addEventListener('click',e=>{
-  if(e.target?.closest?.('.pad') || e.target?.id==='playBtn' || e.target?.id==='stopBtn' || e.target?.id==='audioBtn' || e.target?.id==='installBtn' || e.target?.id==='floatingTransport') return;
+  if(e.target?.closest?.('.pad') || e.target?.id==='playBtn' || e.target?.id==='stopBtn' || e.target?.id==='installBtn' || e.target?.id==='floatingTransport') return;
   scheduleAutoSave();
 });
 window.addEventListener('pagehide',()=>{ try{localStorage.setItem(PROJECT_KEY,JSON.stringify(makeProjectState()));}catch(_){} });

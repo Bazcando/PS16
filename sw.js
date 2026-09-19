@@ -1,4 +1,4 @@
-const CACHE = 'ps16-layout-lock-v1';
+const CACHE = 'ps16-acid-audio-auto-v1';
 const ASSETS = [
   './',
   './index.html',
