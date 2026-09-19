@@ -193,6 +193,19 @@ html{scroll-snap-type:none!important}
   .collapsible-body{margin-top:8px}
 }
 
+
+/* MOBILE FLOW FIX: use the document as the only vertical scroller */
+html,body{height:auto!important;min-height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;scroll-snap-type:none!important;overscroll-behavior-y:auto!important;}
+.shell{height:auto!important;max-height:none!important;overflow:visible!important;scroll-snap-type:none!important;scroll-behavior:auto!important;overscroll-behavior-y:auto!important;}
+.topbar,.panel{scroll-snap-align:none!important;scroll-snap-stop:normal!important;}
+.snap-nav{position:sticky!important;top:0!important;z-index:80!important;}
+.panel>.section-head{position:relative!important;top:auto!important;}
+@media(max-width:760px){
+  html,body{height:auto!important;overflow-y:auto!important;overflow-x:hidden!important;}
+  .shell{height:auto!important;max-height:none!important;overflow:visible!important;padding-bottom:96px!important;}
+  .panel{min-height:0!important;scroll-margin-top:54px!important;}
+}
+
 </style>
 </head>
 <body>
@@ -662,10 +675,19 @@ function initUI(){
     b.className='pad';
     b.dataset.pad=i;
     let pressTimer;
-    b.addEventListener('pointerdown',()=>{pressTimer=setTimeout(()=>selectPad(i),450)});
+    b.addEventListener('pointerdown',async e=>{
+      if(e.pointerType==='mouse' && e.button!==0) return;
+      selectPad(i);
+      pressTimer=setTimeout(()=>selectPad(i),450);
+      try{
+        await ensureAudio();
+        triggerPad(selectedBank,i,ctx.currentTime+.001,true);
+      }catch(err){ console.warn('Pad audio start failed',err); }
+    });
     b.addEventListener('pointerup',()=>clearTimeout(pressTimer));
+    b.addEventListener('pointercancel',()=>clearTimeout(pressTimer));
     b.addEventListener('pointerleave',()=>clearTimeout(pressTimer));
-    b.addEventListener('click',async()=>{selectPad(i);await ensureAudio();triggerPad(selectedBank,i,ctx.currentTime+.01,true)});
+    b.addEventListener('click',e=>e.preventDefault());
     padWrap.appendChild(b);
   }
 
@@ -710,7 +732,7 @@ function setupSwipes(){
 
 async function ensureAudio(){
   if(!ctx){
-    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
     master=ctx.createGain();
     sceneGate=ctx.createGain(); sceneGate.gain.value=1;
     filterNode=ctx.createBiquadFilter(); filterNode.type='lowpass'; filterNode.frequency.value=18000;
@@ -1705,51 +1727,57 @@ if($('exportWav')) $('exportWav').addEventListener('click',exportWav);
 
 
 function setupCollapsibleSections(){
-  const defaultOpen = new Set(['padsSection','seqSection']);
+  const defaultOpen=new Set(['padsSection','seqSection']);
   const panels=[...document.querySelectorAll('section.panel')].filter(sec=>!sec.classList.contains('transport'));
+
   panels.forEach((sec,idx)=>{
-    const head=[...sec.children].find(el=>el.classList && el.classList.contains('section-head'));
+    const head=[...sec.children].find(el=>el.classList?.contains('section-head'));
     if(!head) return;
     if(!sec.id){
       const title=(head.querySelector('h2')?.textContent||`section-${idx}`).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
       sec.id=title+'Section';
     }
-    const body=document.createElement('div');
-    body.className='collapsible-body';
-    let node=head.nextSibling;
-    while(node){
-      const next=node.nextSibling;
-      body.appendChild(node);
-      node=next;
+    if(!sec.querySelector(':scope > .collapsible-body')){
+      const body=document.createElement('div');
+      body.className='collapsible-body';
+      while(head.nextSibling) body.appendChild(head.nextSibling);
+      sec.appendChild(body);
     }
-    sec.appendChild(body);
-    const shouldOpen=defaultOpen.has(sec.id);
-    sec.classList.toggle('is-collapsed',!shouldOpen);
+    const open=defaultOpen.has(sec.id);
+    sec.classList.toggle('is-collapsed',!open);
     head.setAttribute('role','button');
     head.setAttribute('tabindex','0');
-    head.setAttribute('aria-expanded',String(shouldOpen));
+    head.setAttribute('aria-expanded',String(open));
     const toggle=()=>{
-      const collapsed=sec.classList.toggle('is-collapsed');
-      head.setAttribute('aria-expanded',String(!collapsed));
+      const nowCollapsed=sec.classList.toggle('is-collapsed');
+      head.setAttribute('aria-expanded',String(!nowCollapsed));
     };
-    head.addEventListener('click',toggle);
-    head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+    head.onclick=toggle;
+    head.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}};
   });
 
-  document.querySelectorAll('.snap-nav [data-jump]').forEach(btn=>{
-    btn.addEventListener('click',e=>{
-      e.preventDefault();
-      const target=document.getElementById(btn.dataset.jump);
-      if(!target) return;
-      if(target.classList.contains('is-collapsed')){
-        target.classList.remove('is-collapsed');
-        const h=target.querySelector(':scope > .section-head');
-        if(h) h.setAttribute('aria-expanded','true');
-      }
-      target.scrollIntoView({behavior:'smooth',block:'start'});
+  const jumpTo=id=>{
+    const target=document.getElementById(id);
+    if(!target) return;
+    if(target.classList.contains('is-collapsed')){
+      target.classList.remove('is-collapsed');
+      target.querySelector(':scope > .section-head')?.setAttribute('aria-expanded','true');
+    }
+    requestAnimationFrame(()=>{
+      const nav=document.querySelector('.snap-nav');
+      const offset=(nav?.getBoundingClientRect().height||0)+8;
+      const top=window.scrollY+target.getBoundingClientRect().top-offset;
+      window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
     });
+  };
+
+  document.querySelectorAll('.snap-nav [data-jump]').forEach(btn=>{
+    btn.onclick=e=>{e.preventDefault();e.stopPropagation();jumpTo(btn.dataset.jump);};
   });
 }
+
+// Prime the Web Audio graph on the first genuine user gesture so later pad hits are immediate.
+document.addEventListener('pointerdown',()=>{ if(!ctx) ensureAudio().catch(()=>{}); },{once:true,capture:true});
 
 setupCollapsibleSections();
 initUI();
