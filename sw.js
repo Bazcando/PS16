@@ -1,4 +1,4 @@
-const CACHE = 'ps16-acid-audio-auto-v1';
+const CACHE = 'ps16-collapsible-v1';
 const ASSETS = [
   './',
   './index.html',

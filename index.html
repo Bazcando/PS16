@@ -79,7 +79,7 @@ footer{text-align:center;color:#777;font-size:.7rem;margin-top:16px;line-height:
 .mode-on{background:#5c8f5c;border-color:#75b075;color:#fff}
 
 
-.acid-panel{display:none}
+.acid-panel{display:block}
 .acid-panel.show{display:block}
 .acid-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .acid-wave{min-height:54px;font-weight:800;letter-spacing:.08em}
@@ -170,6 +170,28 @@ html{scroll-behavior:smooth}
 .acid-wave{background:#353b29;border-color:#70785b;color:#eef59a}
 @media(max-width:700px){.acid-303-grid{grid-template-columns:repeat(3,1fr)}}
 
+
+/* Compact accordion layout */
+html{scroll-snap-type:none!important}
+.panel{scroll-snap-align:none!important;min-height:0!important}
+.panel>.section-head{position:relative!important;top:auto!important;cursor:pointer;user-select:none;margin-bottom:0!important;padding:2px 0}
+.panel>.section-head::after{content:"▾";margin-left:auto;color:var(--accent2);font-size:1rem;transition:transform .18s ease}
+.panel.is-collapsed>.section-head::after{transform:rotate(-90deg)}
+.panel>.section-head h2{pointer-events:none}
+.collapsible-body{overflow:hidden;transition:max-height .22s ease,opacity .18s ease,margin-top .18s ease;max-height:4000px;opacity:1;margin-top:10px}
+.panel.is-collapsed>.collapsible-body{max-height:0!important;opacity:0;margin-top:0;pointer-events:none}
+.panel.is-collapsed{padding-top:10px;padding-bottom:10px}
+.panel.is-collapsed>.section-head{margin:0!important}
+.panel.transport{position:sticky;top:0;z-index:25;margin-top:0;border-radius:0 0 14px 14px}
+.snap-nav{position:sticky;top:64px;z-index:24;overflow-x:auto;display:flex;gap:6px;padding:6px 0;background:linear-gradient(180deg,rgba(17,17,17,.98),rgba(17,17,17,.84));backdrop-filter:blur(8px)}
+.snap-nav button{flex:0 0 auto;padding:7px 10px;font-size:.68rem}
+@media(max-width:620px){
+  .shell{padding-top:0}
+  .panel{margin-top:8px}
+  .panel>.section-head{min-height:34px}
+  .collapsible-body{margin-top:8px}
+}
+
 </style>
 </head>
 <body>
@@ -241,7 +263,7 @@ html{scroll-behavior:smooth}
     </section>
 
     <section id="acidPanel" class="panel controls acid-panel">
-      <div class="section-head"><h2>ACID ENGINE</h2><span>303-style monosynth</span></div>
+      <div class="section-head"><h2>ACID ENGINE</h2><span>303-style monosynth · follows pad number</span></div>
       <div class="acid-grid acid-303-grid">
         <label class="knob-wrap">TUNE<div class="knob"><input id="acidTune" type="range" min="-12" max="12" value="0" step="1"></div><span class="knob-value" id="acidTuneVal">0 st</span></label>
         <label class="knob-wrap">CUTOFF<div class="knob"><input id="acidCutoff" type="range" min="0" max="1" value="0.46" step="0.01"></div><span class="knob-value" id="acidCutoffVal">46%</span></label>
@@ -544,6 +566,7 @@ async function clearSavedProject(){
 }
 
 function currentPadObj(){ return banks[selectedBank].pads[selectedPad]; }
+function currentAcidPadObj(){ return banks.find(b=>b.name==='ACID').pads[selectedPad]; }
 function bankColor(bankIndex){ return `hsl(${banks[bankIndex].hue} 82% 58%)`; }
 function padColor(bankIndex,padIndex){
   const hue=(banks[bankIndex].hue + (padIndex%4)*8 + Math.floor(padIndex/4)*3) % 360;
@@ -714,7 +737,7 @@ async function ensureAudio(){
 
 function selectBank(i){
   selectedBank=((i%banks.length)+banks.length)%banks.length;
-  $('acidPanel').classList.toggle('show',banks[selectedBank].name==='ACID');
+  $('acidPanel').classList.add('show');
   document.querySelectorAll('.bank-btn').forEach((el,idx)=>el.classList.toggle('active',idx===selectedBank));
   renderPads();
   updateSelectedLabel();
@@ -747,11 +770,12 @@ function syncControls(){
   const p=currentPadObj();
   $('volume').value=p.volume; $('pitch').value=p.pitch; $('start').value=p.start; $('end').value=p.end;
   ['wobble','trem','grit','space','pan','tone','attack','decay'].forEach(id=>{$(id).value=p[id]; updateKnob(id);});
-  if($('acidTune')){ $('acidTune').value=p.pitch||0; updateKnob('acidTune'); }
-  if($('acidCutoff')){ $('acidCutoff').value=p.tone??0.46; updateKnob('acidCutoff'); }
-  if($('acidDecay')){ $('acidDecay').value=p.decay??0.34; updateKnob('acidDecay'); }
-  ['acidRes','acidEnv','acidGlide','acidAccent'].forEach(id=>{if($(id)){ $(id).value=p[id]; updateKnob(id); }});
-  if($('acidWave')) $('acidWave').textContent='WAVE: '+(p.acidWave==='square'?'SQUARE':'SAW');
+  const ap=currentAcidPadObj();
+  if($('acidTune')){ $('acidTune').value=ap.pitch||0; updateKnob('acidTune'); }
+  if($('acidCutoff')){ $('acidCutoff').value=ap.tone??0.46; updateKnob('acidCutoff'); }
+  if($('acidDecay')){ $('acidDecay').value=ap.decay??0.34; updateKnob('acidDecay'); }
+  ['acidRes','acidEnv','acidGlide','acidAccent'].forEach(id=>{if($(id)){ $(id).value=ap[id]; updateKnob(id); }});
+  if($('acidWave')) $('acidWave').textContent='WAVE: '+(ap.acidWave==='square'?'SQUARE':'SAW');
 }
 
 function renderTrackOverview(){
@@ -1164,7 +1188,7 @@ ACID_KNOBS.forEach(id=>{
   });
   updateKnob(id);
 });
-$('acidWave').addEventListener('click',()=>{const p=currentPadObj();p.acidWave=p.acidWave==='square'?'sawtooth':'square';$('acidWave').textContent='WAVE: '+(p.acidWave==='square'?'SQUARE':'SAW');auditionSelected(20);});
+$('acidWave').addEventListener('click',()=>{const p=currentAcidPadObj();p.acidWave=p.acidWave==='square'?'sawtooth':'square';$('acidWave').textContent='WAVE: '+(p.acidWave==='square'?'SQUARE':'SAW');auditionSelected(20);});
 
 // Touch-friendly knob control: drag vertically anywhere on the knob.
 [...PLAY_KNOBS,...ACID_KNOBS].forEach(id=>{
@@ -1258,7 +1282,7 @@ async function beginMicRecording(){
         const blob=new Blob(chunks,{type});
         const ab=await blob.arrayBuffer();
         const buf=await ctx.decodeAudioData(ab.slice(0));
-        const p=currentPadObj();
+        const p=ACID_KNOBS.includes(id)?currentAcidPadObj():currentPadObj();
         p.buffer=buf; p.sourceBlob=blob; p.engine=null; p.oneShot=true; p.name='MIC '+String(selectedPad+1).padStart(2,'0'); p.start=0; p.end=1;
         renderPads(); updateSelectedLabel(); syncControls();
         setMicStatus(buf.duration.toFixed(1)+'s captured');
@@ -1678,6 +1702,56 @@ async function exportWav(){
 }
 if($('exportWav')) $('exportWav').addEventListener('click',exportWav);
 
+
+
+function setupCollapsibleSections(){
+  const defaultOpen = new Set(['padsSection','seqSection']);
+  const panels=[...document.querySelectorAll('section.panel')].filter(sec=>!sec.classList.contains('transport'));
+  panels.forEach((sec,idx)=>{
+    const head=[...sec.children].find(el=>el.classList && el.classList.contains('section-head'));
+    if(!head) return;
+    if(!sec.id){
+      const title=(head.querySelector('h2')?.textContent||`section-${idx}`).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      sec.id=title+'Section';
+    }
+    const body=document.createElement('div');
+    body.className='collapsible-body';
+    let node=head.nextSibling;
+    while(node){
+      const next=node.nextSibling;
+      body.appendChild(node);
+      node=next;
+    }
+    sec.appendChild(body);
+    const shouldOpen=defaultOpen.has(sec.id);
+    sec.classList.toggle('is-collapsed',!shouldOpen);
+    head.setAttribute('role','button');
+    head.setAttribute('tabindex','0');
+    head.setAttribute('aria-expanded',String(shouldOpen));
+    const toggle=()=>{
+      const collapsed=sec.classList.toggle('is-collapsed');
+      head.setAttribute('aria-expanded',String(!collapsed));
+    };
+    head.addEventListener('click',toggle);
+    head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+  });
+
+  document.querySelectorAll('.snap-nav [data-jump]').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.preventDefault();
+      const target=document.getElementById(btn.dataset.jump);
+      if(!target) return;
+      if(target.classList.contains('is-collapsed')){
+        target.classList.remove('is-collapsed');
+        const h=target.querySelector(':scope > .section-head');
+        if(h) h.setAttribute('aria-expanded','true');
+      }
+      target.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+}
+
+setupCollapsibleSections();
 initUI();
 updateFloatingTransport();
 initSceneFX();
