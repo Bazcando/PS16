@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/32411482/README.md)
 # PS-16 Pocket Sampler
 
 PS-16 is a mobile-first browser groovebox and sampler inspired by compact hardware samplers, step sequencers and acid boxes.
@@ -220,3 +219,8 @@ For microphone sampling and full PWA behaviour, use a secure HTTPS-hosted versio
 
 PS-16 is an experimental groovebox project and is still evolving. The current focus is on fast mobile workflow, live performance, sampling, sequencing and DAWless-style interaction.
 
+
+
+## Audio startup
+
+Audio starts automatically on the first Play or pad tap. There is no separate Enable Audio step.
