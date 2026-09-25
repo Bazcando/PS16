@@ -206,6 +206,9 @@ html,body{height:auto!important;min-height:100%!important;overflow-x:hidden!impo
   .panel{min-height:0!important;scroll-margin-top:54px!important;}
 }
 
+
+.live-record-panel{margin-top:12px;padding:10px;border:1px solid #454545;border-radius:12px;background:#141414}
+.live-record-grid{display:grid;grid-template-columns:auto 1fr 1fr;gap:10px;align-items:end}.live-record-grid label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.68rem}.live-record-grid select{background:#111;color:var(--ink);border:1px solid #3d3d3d;border-radius:8px;padding:9px}.rec-live{min-width:92px;font-weight:900}.rec-live.active{background:#b52b2b;border-color:#ef5a5a;box-shadow:0 0 14px rgba(239,90,90,.28)}.timing-readout{font-size:.68rem;color:var(--muted);margin-top:8px}.step.microtimed{box-shadow:inset 0 3px 0 #7ce2ff}.step.microtimed:before{content:'↔';position:absolute;left:2px;bottom:1px;font-size:.48rem;color:#d7f8ff;background:#0008;border-radius:3px;padding:0 2px}@media(max-width:520px){.live-record-grid{grid-template-columns:1fr 1fr}.rec-live{grid-column:1/-1}.live-record-grid label:last-child{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -213,7 +216,7 @@ html,body{height:auto!important;min-height:100%!important;overflow-x:hidden!impo
     <header class="topbar">
       <div>
         <div class="eyebrow">POCKET SAMPLER</div>
-        <h1>PS-16</h1>
+        <h1>PS-16</h1><div id="buildBadge" style="font-size:.62rem;color:#9ad0ff;margin-top:4px">BUILD 2026.09.24-SAMPLE-SCALE</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center"><button id="installBtn" class="pill" hidden>INSTALL</button></div>
     </header>
@@ -270,10 +273,10 @@ html,body{height:auto!important;min-height:100%!important;overflow-x:hidden!impo
       <div class="section-head"><h2>SCALE MODE</h2><span>ACID pad layout</span></div>
       <div class="scale-grid">
         <label>ROOT<select id="scaleRoot"><option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option><option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option></select></label>
-        <label>SCALE<select id="scaleType"><option value="minor">Minor</option><option value="major">Major</option><option value="pentMinor">Minor pentatonic</option><option value="pentMajor">Major pentatonic</option><option value="dorian">Dorian</option><option value="phrygian">Phrygian</option></select></label>
+        <label>SCALE<select id="scaleType"><option value="chromatic">Chromatic</option><option value="minor">Minor</option><option value="major">Major</option><option value="pentMinor">Minor pentatonic</option><option value="pentMajor">Major pentatonic</option><option value="dorian">Dorian</option><option value="phrygian">Phrygian</option></select></label>
       </div>
-      <div class="button-row"><button id="applyScale">APPLY TO ACID PADS</button></div>
-      <div class="small-note">Remaps all 16 ACID pads to notes in the chosen scale, starting around C2. Great for fast melodic sequencing.</div>
+      <div class="button-row"><button id="applyScale">APPLY TO ACID PADS</button><button id="mapSampleScale">MAP SELECTED SAMPLE → 16 PADS</button></div>
+      <div class="small-note">The same Root + Scale controls can now map either the ACID synth or one recorded/imported sample across 16 pads. For sample mapping, treat the selected sample as the chosen root note.</div>
     </section>
 
     <section id="acidPanel" class="panel controls acid-panel">
@@ -296,6 +299,15 @@ html,body{height:auto!important;min-height:100%!important;overflow-x:hidden!impo
       <div class="section-head"><h2>SEQUENCER</h2><span>steps match selected pad colour</span></div>
       <div id="trackOverview" class="track-overview" aria-label="Programmed pad overview"></div>
       <div id="steps" class="steps"></div>
+      <div class="live-record-panel">
+        <div class="section-head" style="margin-bottom:8px"><h2>LIVE RECORD</h2><span id="liveRecordStatus">OFF</span></div>
+        <div class="live-record-grid">
+          <button id="liveRecordBtn" class="rec-live">● REC</button>
+          <label>QUANTISE GRID<select id="recordQuantGrid"><option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option></select></label>
+          <label>QUANTISE STRENGTH <input id="recordQuantStrength" type="range" min="0" max="100" value="50" step="5"><span id="recordQuantStrengthVal">50%</span></label>
+        </div>
+        <div class="timing-readout">0% keeps your timing almost exactly as played. 100% pulls hits fully onto the selected grid. Recorded timing is stored with the pattern.</div>
+      </div>
       <div class="lock-editor">
         <strong id="stepLockLabel">STEP LOCKS · long-press a step</strong>
         <div class="step-lock-grid">
@@ -306,9 +318,10 @@ html,body{height:auto!important;min-height:100%!important;overflow-x:hidden!impo
           <label class="step-lock-control">GRIT<input id="stepGritLock" type="range" min="-1" max="100" value="-1" step="1" disabled><span class="lock-value" id="stepGritLockVal">—</span></label>
           <label class="step-lock-control">PAN<input id="stepPanLock" type="range" min="-101" max="100" value="-101" step="1" disabled><span class="lock-value" id="stepPanLockVal">—</span></label>
           <label class="step-lock-control">DECAY<input id="stepDecayLock" type="range" min="-1" max="300" value="-1" step="1" disabled><span class="lock-value" id="stepDecayLockVal">—</span></label>
+          <label class="step-lock-control">TIMING<input id="stepTimingLock" type="range" min="-49" max="49" value="0" step="1" disabled><span class="lock-value" id="stepTimingLockVal">—</span></label>
         </div>
         <div class="button-row" style="margin-top:8px"><button id="clearStepLocks" disabled>CLEAR STEP LOCKS</button></div>
-        <div class="small-note">Long-press a step. Probability adds variation; Ratchet gives 2–4 hits; Tone, Grit, Pan and Decay override only that step. INHERIT uses the pad's normal setting.</div>
+        <div class="small-note">Long-press a step. Probability adds variation; Ratchet gives 2–4 hits; Tone, Grit, Pan and Decay override only that step. Timing moves a hit early/late by up to half a 16th. INHERIT uses the pad's normal setting.</div>
       </div>
       <div class="button-row">
         <button id="clearPattern">CLEAR PAD</button>
@@ -427,19 +440,21 @@ const BANK_DEFS=[
 ];
 
 function newPad(i){
-  return {buffer:null,name:`PAD ${i+1}`,volume:1,pitch:0,start:0,end:1,wobble:0,trem:0,grit:0,space:0,pan:0,tone:.85,attack:0,decay:1,engine:null,noteHz:55,acidRes:.65,acidEnv:.7,acidGlide:.2,acidAccent:.35,acidWave:'sawtooth',sourceBlob:null,oneShot:false,steps:Array(NUM_STEPS).fill(false),pitchLocks:Array(NUM_STEPS).fill(null),probabilityLocks:Array(NUM_STEPS).fill(100),ratchetLocks:Array(NUM_STEPS).fill(1),toneLocks:Array(NUM_STEPS).fill(null),gritLocks:Array(NUM_STEPS).fill(null),panLocks:Array(NUM_STEPS).fill(null),decayLocks:Array(NUM_STEPS).fill(null)};
+  return {buffer:null,name:`PAD ${i+1}`,volume:1,pitch:0,start:0,end:1,wobble:0,trem:0,grit:0,space:0,pan:0,tone:.85,attack:0,decay:1,engine:null,noteHz:55,acidRes:.65,acidEnv:.7,acidGlide:.2,acidAccent:.35,acidWave:'sawtooth',sourceBlob:null,oneShot:false,steps:Array(NUM_STEPS).fill(false),pitchLocks:Array(NUM_STEPS).fill(null),probabilityLocks:Array(NUM_STEPS).fill(100),ratchetLocks:Array(NUM_STEPS).fill(1),toneLocks:Array(NUM_STEPS).fill(null),gritLocks:Array(NUM_STEPS).fill(null),panLocks:Array(NUM_STEPS).fill(null),decayLocks:Array(NUM_STEPS).fill(null),timingLocks:Array(NUM_STEPS).fill(0)};
 }
 const banks=BANK_DEFS.map((b)=>({name:b.name,hue:b.hue,pads:Array.from({length:NUM_PADS},(_,i)=>newPad(i))}));
 const mixer=BANK_DEFS.map(()=>({volume:1,mute:false,solo:false}));
 let bankGainNodes=[];
 let ctx=null, master=null, filterNode=null, driveNode=null, delayNode=null, feedbackNode=null, dryNode=null, sceneGate=null;
 let selectedBank=0, selectedPad=0, currentStep=0, sequenceStep=0, playing=false, timer=null, nextNoteTime=0;
+let liveRecording=false, transportStartTime=0;
 let micRecorder=null, micStream=null, micChunks=[], micStopTimer=null, micStartedAt=0, micTicker=null;
+let micSource=null, micProcessor=null, micSilentGain=null, micPcmChunks=[], micPcmFrames=0;
 const NUM_PATTERNS=8;
 let selectedPattern=0, chain=[], chainMode=false, chainPosition=0, barsScheduled=0;
 let selectedLockStep=null;
 const patterns=Array.from({length:NUM_PATTERNS},()=>null);
-const lookahead=25, scheduleAhead=0.08;
+const lookahead=20, scheduleAhead=0.26;
 const activeVoices=[];
 const MAX_VOICES=28;
 const $=id=>document.getElementById(id);
@@ -462,7 +477,7 @@ function serialisePad(p){
     wobble:p.wobble, trem:p.trem, grit:p.grit, space:p.space, pan:p.pan, tone:p.tone,
     attack:p.attack, decay:p.decay, engine:p.engine, noteHz:p.noteHz, oneShot:!!p.oneShot,
     acidRes:p.acidRes, acidEnv:p.acidEnv, acidGlide:p.acidGlide, acidAccent:p.acidAccent, acidWave:p.acidWave,
-    steps:p.steps.slice(), pitchLocks:p.pitchLocks.slice(), probabilityLocks:p.probabilityLocks.slice(), ratchetLocks:p.ratchetLocks.slice(), toneLocks:p.toneLocks.slice(), gritLocks:p.gritLocks.slice(), panLocks:p.panLocks.slice(), decayLocks:p.decayLocks.slice(), hasCustomAudio:!!p.sourceBlob
+    steps:p.steps.slice(), pitchLocks:p.pitchLocks.slice(), probabilityLocks:p.probabilityLocks.slice(), ratchetLocks:p.ratchetLocks.slice(), toneLocks:p.toneLocks.slice(), gritLocks:p.gritLocks.slice(), panLocks:p.panLocks.slice(), decayLocks:p.decayLocks.slice(), timingLocks:(p.timingLocks||Array(NUM_STEPS).fill(0)).slice(), hasCustomAudio:!!p.sourceBlob
   };
 }
 function makeProjectState(){
@@ -494,7 +509,7 @@ function applyProjectState(state){
       p.steps=(saved.steps||Array(NUM_STEPS).fill(false)).slice();
       p.pitchLocks=(saved.pitchLocks||Array(NUM_STEPS).fill(null)).slice();
       p.probabilityLocks=(saved.probabilityLocks||Array(NUM_STEPS).fill(100)).slice(); p.ratchetLocks=(saved.ratchetLocks||Array(NUM_STEPS).fill(1)).slice();
-      p.toneLocks=(saved.toneLocks||Array(NUM_STEPS).fill(null)).slice(); p.gritLocks=(saved.gritLocks||Array(NUM_STEPS).fill(null)).slice(); p.panLocks=(saved.panLocks||Array(NUM_STEPS).fill(null)).slice(); p.decayLocks=(saved.decayLocks||Array(NUM_STEPS).fill(null)).slice();
+      p.toneLocks=(saved.toneLocks||Array(NUM_STEPS).fill(null)).slice(); p.gritLocks=(saved.gritLocks||Array(NUM_STEPS).fill(null)).slice(); p.panLocks=(saved.panLocks||Array(NUM_STEPS).fill(null)).slice(); p.decayLocks=(saved.decayLocks||Array(NUM_STEPS).fill(null)).slice(); p.timingLocks=(saved.timingLocks||Array(NUM_STEPS).fill(0)).slice();
     }));
     if(Array.isArray(state.patterns)) state.patterns.forEach((p,i)=>patterns[i]=p?JSON.parse(JSON.stringify(p)):null);
     selectedPattern=Math.max(0,Math.min(NUM_PATTERNS-1,state.selectedPattern||0));
@@ -594,6 +609,7 @@ function snapshotSteps(){
     pitchLocks:banks.map(bank=>bank.pads.map(p=>p.pitchLocks.slice())),
     probabilityLocks:banks.map(bank=>bank.pads.map(p=>p.probabilityLocks.slice())), ratchetLocks:banks.map(bank=>bank.pads.map(p=>p.ratchetLocks.slice())),
     toneLocks:banks.map(bank=>bank.pads.map(p=>p.toneLocks.slice())), gritLocks:banks.map(bank=>bank.pads.map(p=>p.gritLocks.slice())), panLocks:banks.map(bank=>bank.pads.map(p=>p.panLocks.slice())), decayLocks:banks.map(bank=>bank.pads.map(p=>p.decayLocks.slice())),
+    timingLocks:banks.map(bank=>bank.pads.map(p=>(p.timingLocks||Array(NUM_STEPS).fill(0)).slice())),
     pitches:banks.map(bank=>bank.pads.map(p=>p.pitch))
   };
 }
@@ -603,18 +619,20 @@ function blankPattern(){
     pitchLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),
     probabilityLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(100))), ratchetLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(1))),
     toneLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))), gritLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))), panLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))), decayLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),
+    timingLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(0))),
     pitches:banks.map(bank=>bank.pads.map(()=>0))
   };
 }
 function restoreSteps(snapshot){
   if(!snapshot) return;
   // Backward compatibility with older in-memory step-only snapshots.
-  if(Array.isArray(snapshot)){ snapshot={steps:snapshot,pitchLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),probabilityLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(100))),ratchetLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(1))),toneLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),gritLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),panLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),decayLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),pitches:banks.map(bank=>bank.pads.map(()=>0))}; }
+  if(Array.isArray(snapshot)){ snapshot={steps:snapshot,pitchLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),probabilityLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(100))),ratchetLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(1))),toneLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),gritLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),panLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),decayLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(null))),timingLocks:banks.map(bank=>bank.pads.map(()=>Array(NUM_STEPS).fill(0))),pitches:banks.map(bank=>bank.pads.map(()=>0))}; }
   banks.forEach((bank,bi)=>bank.pads.forEach((p,pi)=>{
     p.steps=(snapshot.steps?.[bi]?.[pi]||Array(NUM_STEPS).fill(false)).slice();
     p.pitchLocks=(snapshot.pitchLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(null)).slice();
     p.probabilityLocks=(snapshot.probabilityLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(100)).slice(); p.ratchetLocks=(snapshot.ratchetLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(1)).slice();
     p.toneLocks=(snapshot.toneLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(null)).slice(); p.gritLocks=(snapshot.gritLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(null)).slice(); p.panLocks=(snapshot.panLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(null)).slice(); p.decayLocks=(snapshot.decayLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(null)).slice();
+    p.timingLocks=(snapshot.timingLocks?.[bi]?.[pi]||Array(NUM_STEPS).fill(0)).slice();
     if(snapshot.pitches?.[bi]?.[pi]!==undefined) p.pitch=snapshot.pitches[bi][pi];
   }));
   selectedLockStep=null;
@@ -682,6 +700,7 @@ function initUI(){
       try{
         await ensureAudio();
         triggerPad(selectedBank,i,ctx.currentTime+.001,true);
+        if(liveRecording && playing) recordLivePadHit(selectedBank,i,ctx.currentTime);
       }catch(err){ console.warn('Pad audio start failed',err); }
     });
     b.addEventListener('pointerup',()=>clearTimeout(pressTimer));
@@ -823,8 +842,8 @@ function renderSteps(){
     el.style.setProperty('--step-color',color);
     const p=currentPadObj();
     el.classList.toggle('active',p.steps[i]);
-    const tags=[]; if(p.pitchLocks[i]!==null&&p.pitchLocks[i]!==0)tags.push('P'); if((p.probabilityLocks[i]??100)<100)tags.push('%'); if((p.ratchetLocks[i]??1)>1)tags.push('R'+p.ratchetLocks[i]); if(p.toneLocks[i]!==null||p.gritLocks[i]!==null||p.panLocks[i]!==null||p.decayLocks[i]!==null)tags.push('FX');
-    el.dataset.lock=tags.join(' '); el.classList.toggle('locked',tags.length>0); el.classList.toggle('probabilistic',(p.probabilityLocks[i]??100)<100); el.classList.toggle('ratcheted',(p.ratchetLocks[i]??1)>1);
+    const tags=[]; if(p.pitchLocks[i]!==null&&p.pitchLocks[i]!==0)tags.push('P'); if((p.probabilityLocks[i]??100)<100)tags.push('%'); if((p.ratchetLocks[i]??1)>1)tags.push('R'+p.ratchetLocks[i]); if(p.toneLocks[i]!==null||p.gritLocks[i]!==null||p.panLocks[i]!==null||p.decayLocks[i]!==null)tags.push('FX'); if(Math.abs((p.timingLocks?.[i]||0))>.015)tags.push('T');
+    el.dataset.lock=tags.join(' '); el.classList.toggle('locked',tags.length>0); el.classList.toggle('microtimed',Math.abs((p.timingLocks?.[i]||0))>.015); el.classList.toggle('probabilistic',(p.probabilityLocks[i]??100)<100); el.classList.toggle('ratcheted',(p.ratchetLocks[i]??1)>1);
     el.classList.toggle('lock-selected',selectedLockStep===i);
     el.classList.toggle('playhead',playing&&i===currentStep);
   });
@@ -834,10 +853,10 @@ function selectPitchLockStep(i){
   selectedLockStep=i; renderSteps(); renderPitchLockEditor(); saveCurrentPattern();
 }
 function renderPitchLockEditor(){
-  const ids=['stepPitchLock','stepProbability','stepRatchet','stepToneLock','stepGritLock','stepPanLock','stepDecayLock'];
+  const ids=['stepPitchLock','stepProbability','stepRatchet','stepToneLock','stepGritLock','stepPanLock','stepDecayLock','stepTimingLock'];
   const p=currentPadObj(), active=selectedLockStep!==null;
   ids.forEach(id=>{if($(id))$(id).disabled=!active}); if($('clearStepLocks'))$('clearStepLocks').disabled=!active;
-  if(!active){ $('stepLockLabel').textContent='STEP LOCKS · long-press a step'; ['stepPitchLockVal','stepProbabilityVal','stepRatchetVal','stepToneLockVal','stepGritLockVal','stepPanLockVal','stepDecayLockVal'].forEach(id=>{if($(id))$(id).textContent='—'}); return; }
+  if(!active){ $('stepLockLabel').textContent='STEP LOCKS · long-press a step'; ['stepPitchLockVal','stepProbabilityVal','stepRatchetVal','stepToneLockVal','stepGritLockVal','stepPanLockVal','stepDecayLockVal','stepTimingLockVal'].forEach(id=>{if($(id))$(id).textContent='—'}); return; }
   const i=selectedLockStep; $('stepLockLabel').textContent=`STEP ${i+1} LOCKS`;
   $('stepPitchLock').value=p.pitchLocks[i]??0; $('stepPitchLockVal').textContent=(p.pitchLocks[i]??0)===0?'0 st':`${p.pitchLocks[i]>0?'+':''}${p.pitchLocks[i]} st`;
   $('stepProbability').value=p.probabilityLocks[i]??100; $('stepProbabilityVal').textContent=(p.probabilityLocks[i]??100)+'%';
@@ -846,6 +865,7 @@ function renderPitchLockEditor(){
   const grit=p.gritLocks[i]; $('stepGritLock').value=grit===null?-1:Math.round(grit*100); $('stepGritLockVal').textContent=grit===null?'INHERIT':Math.round(grit*100)+'%';
   const pan=p.panLocks[i]; $('stepPanLock').value=pan===null?-101:Math.round(pan*100); $('stepPanLockVal').textContent=pan===null?'INHERIT':(pan<-.05?'L '+Math.round(-pan*100):pan>.05?'R '+Math.round(pan*100):'CENTRE');
   const dec=p.decayLocks[i]; $('stepDecayLock').value=dec===null?-1:Math.round(dec*100); $('stepDecayLockVal').textContent=dec===null?'INHERIT':dec.toFixed(2)+'s';
+  const timing=p.timingLocks?.[i]||0; $('stepTimingLock').value=Math.round(timing*100); $('stepTimingLockVal').textContent=Math.abs(timing)<.005?'ON GRID':`${timing<0?'EARLY ':'LATE '}${Math.round(Math.abs(timing)*100)}%`;
 }
 function flashPad(bankIndex,padIndex){
   if(bankIndex!==selectedBank) return;
@@ -1103,13 +1123,60 @@ function initSceneFX(){
   });
 }
 
+function updateLiveRecordUI(){
+  const btn=$('liveRecordBtn'), st=$('liveRecordStatus');
+  if(btn){btn.classList.toggle('active',liveRecording);btn.textContent=liveRecording?'■ REC':'● REC';}
+  if(st) st.textContent=liveRecording?'OVERDUBBING':'OFF';
+}
+function quantGridStepUnits(){
+  const v=+$('recordQuantGrid')?.value||16;
+  if(v===4) return 4;
+  if(v===8) return 2;
+  if(v===32) return .5;
+  return 1;
+}
+function recordLivePadHit(bankIndex,padIndex,hitTime){
+  if(!liveRecording||!playing||!transportStartTime) return;
+  const stepDur=secondsPerStep();
+  const elapsed=(hitTime-transportStartTime)/stepDur;
+  const bar=Math.floor(elapsed/NUM_STEPS);
+  let rawInBar=elapsed-(bar*NUM_STEPS);
+  while(rawInBar<0) rawInBar+=NUM_STEPS;
+  while(rawInBar>=NUM_STEPS) rawInBar-=NUM_STEPS;
+  const grid=quantGridStepUnits();
+  let target=Math.round(rawInBar/grid)*grid;
+  if(target>=NUM_STEPS) target-=NUM_STEPS;
+  const strength=Math.max(0,Math.min(1,(+$('recordQuantStrength')?.value||0)/100));
+  let blended=rawInBar + (target-rawInBar)*strength;
+  // Wrap shortest way near the bar edge.
+  if(rawInBar>14 && target<2) blended=rawInBar+((target+NUM_STEPS)-rawInBar)*strength;
+  if(blended>=NUM_STEPS) blended-=NUM_STEPS;
+  const baseStep=((Math.round(blended)%NUM_STEPS)+NUM_STEPS)%NUM_STEPS;
+  let micro=blended-baseStep;
+  if(micro>.5) micro-=1; if(micro<-.5) micro+=1;
+  micro=Math.max(-.49,Math.min(.49,micro));
+  const p=banks[bankIndex].pads[padIndex];
+  p.steps[baseStep]=true;
+  p.timingLocks[baseStep]=micro;
+  saveCurrentPattern(); renderSteps(); scheduleAutoSave();
+}
+async function toggleLiveRecord(){
+  if(liveRecording){liveRecording=false;updateLiveRecordUI();return;}
+  await ensureAudio();
+  liveRecording=true; updateLiveRecordUI();
+  if(!playing) await play();
+}
+if($('liveRecordBtn')) $('liveRecordBtn').addEventListener('click',toggleLiveRecord);
+if($('recordQuantStrength')) $('recordQuantStrength').addEventListener('input',e=>{$('recordQuantStrengthVal').textContent=e.target.value+'%';});
+
 function secondsPerStep(){ return (60/Math.max(40,Math.min(240,+$('bpm').value||120)))/4; }
 function scheduleStep(step,time){
   const stepDur=secondsPerStep();
   banks.forEach((bank,bankIndex)=>bank.pads.forEach((p,padIndex)=>{ if(p.steps[step]){
     const prob=p.probabilityLocks[step]??100; if(Math.random()*100>prob) return;
     const reps=Math.max(1,p.ratchetLocks[step]??1); const overrides={tone:p.toneLocks[step],grit:p.gritLocks[step],pan:p.panLocks[step],decay:p.decayLocks[step]};
-    for(let r=0;r<reps;r++) triggerPad(bankIndex,padIndex,time+(r*stepDur/reps),false,p.pitchLocks[step]??0,overrides);
+    const micro=Math.max(-.49,Math.min(.49,p.timingLocks?.[step]||0));
+    for(let r=0;r<reps;r++) triggerPad(bankIndex,padIndex,Math.max(ctx.currentTime+.001,time+(micro*stepDur)+(r*stepDur/reps)),false,p.pitchLocks[step]??0,overrides);
   }}));
   const delay=Math.max(0,(time-(ctx?.currentTime||0))*1000);
   setTimeout(()=>{ currentStep=step; renderSteps(); },delay);
@@ -1139,10 +1206,10 @@ async function play(){
   clearTimeout(auditionTimer); auditionTimer=null;
   await ensureAudio(); if(playing) return; saveCurrentPattern();
   if(chainMode&&chain.length){ chainPosition=0; selectPattern(chain[0],true); }
-  playing=true; updateFloatingTransport(); currentStep=0; sequenceStep=0; barsScheduled=0; nextNoteTime=ctx.currentTime+.05;
+  playing=true; updateFloatingTransport(); currentStep=0; sequenceStep=0; barsScheduled=0; transportStartTime=ctx.currentTime+.05; nextNoteTime=transportStartTime;
   $('statusText').textContent=chainMode&&chain.length?'chain':'playing'; $('statusDot').parentElement.classList.add('running'); scheduler(); renderSteps(); renderPatternUI();
 }
-function stop(){ playing=false; updateFloatingTransport(); if(timer) clearTimeout(timer); timer=null; currentStep=0; sequenceStep=0; barsScheduled=0; $('statusText').textContent='stopped'; $('statusDot').parentElement.classList.remove('running'); saveCurrentPattern(); renderSteps(); renderPatternUI(); }
+function stop(){ playing=false; if(liveRecording){liveRecording=false;updateLiveRecordUI();} updateFloatingTransport(); if(timer) clearTimeout(timer); timer=null; currentStep=0; sequenceStep=0; barsScheduled=0; $('statusText').textContent='stopped'; $('statusDot').parentElement.classList.remove('running'); saveCurrentPattern(); renderSteps(); renderPatternUI(); }
 
 $('playBtn').onclick=play; $('stopBtn').onclick=stop; if($('floatingTransport')) $('floatingTransport').onclick=()=>playing?stop():play();
 $('copyNextPattern').onclick=()=>{
@@ -1251,17 +1318,13 @@ function setMicStatus(text,live=false){
   el.classList.toggle('live',live);
   const t=el.querySelector('span:last-child'); if(t) t.textContent=text;
 }
-function bestMicMime(){
-  if(typeof MediaRecorder==='undefined') return '';
-  const choices=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
-  return choices.find(x=>MediaRecorder.isTypeSupported?.(x))||'';
-}
+function bestMicMime(){ return ''; } // PCM capture avoids Chromebook MediaRecorder codec/decode mismatches.
 let micHoldActive=false, micPermissionReady=false;
 
 async function requestMicPermission(){
-  if(!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder==='undefined'){
+  if(!navigator.mediaDevices?.getUserMedia){
     setMicStatus('mic unsupported');
-    alert('Microphone recording is not supported here. Use the hosted HTTPS version in Chrome on Android.');
+    alert('Microphone recording is not supported in this browser. Open the hosted HTTPS/PWA version of PS-16 in Chrome.');
     return false;
   }
   try{
@@ -1277,45 +1340,66 @@ async function requestMicPermission(){
     const insecure = !window.isSecureContext;
     setMicStatus(insecure?'needs HTTPS':'permission blocked');
     alert(insecure
-      ? 'Chrome cannot grant microphone access to this local file. Open the hosted HTTPS/PWA version of PS-16, then tap ENABLE MIC again.'
-      : 'Microphone permission was blocked. In Chrome, tap the padlock/site icon → Permissions → Microphone → Allow, then return and tap ENABLE MIC again.');
+      ? 'Chrome cannot grant microphone access to this local file. Open the hosted HTTPS/PWA version of PS-16, then enable the mic again.'
+      : 'Microphone permission was blocked. In Chrome, open Site settings for this page → Microphone → Allow, then return and enable the mic again.');
     return false;
   }
 }
 
 async function beginMicRecording(){
-  if(micRecorder?.state==='recording' || !micPermissionReady) return;
+  if((micProcessor || window._ps16MicWorkletNode) || !micPermissionReady) return;
   micHoldActive=true;
   try{
     if(playing) stop();
     await ensureAudio();
-    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
     if(!micHoldActive){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; return; }
-    const mime=bestMicMime();
-    micRecorder=new MediaRecorder(micStream,mime?{mimeType:mime}:undefined);
-    micChunks=[];
-    micRecorder.ondataavailable=e=>{if(e.data?.size) micChunks.push(e.data)};
-    micRecorder.onerror=()=>{ setMicStatus('recording error'); cleanupMicHold(); };
-    micRecorder.onstop=async()=>{
-      const chunks=micChunks.slice();
-      const type=micRecorder?.mimeType||chunks[0]?.type||'audio/webm';
-      cleanupMicHold(false);
-      if(!chunks.length){ setMicStatus('no audio captured'); return; }
+
+    micPcmChunks=[]; micPcmFrames=0;
+    micSource=ctx.createMediaStreamSource(micStream);
+    let captureReady=false;
+
+    // Preferred path on modern Chrome/ChromeOS: AudioWorklet raw PCM capture.
+    if(ctx.audioWorklet && typeof AudioWorkletNode!=='undefined'){
       try{
-        const blob=new Blob(chunks,{type});
-        const ab=await blob.arrayBuffer();
-        const buf=await ctx.decodeAudioData(ab.slice(0));
-        const p=ACID_KNOBS.includes(id)?currentAcidPadObj():currentPadObj();
-        p.buffer=buf; p.sourceBlob=blob; p.engine=null; p.oneShot=true; p.name='MIC '+String(selectedPad+1).padStart(2,'0'); p.start=0; p.end=1;
-        renderPads(); updateSelectedLabel(); syncControls();
-        setMicStatus(buf.duration.toFixed(1)+'s captured');
-        auditionSelected(50); scheduleAutoSave();
-      }catch(err){
-        console.error(err); setMicStatus('decode failed');
-        alert('The recording was captured but could not be decoded by this browser.');
-      }
-    };
-    micRecorder.start(80);
+        if(!window._ps16MicWorkletLoaded){
+          const workletCode=`class PS16MicCapture extends AudioWorkletProcessor{process(inputs){const ch=inputs?.[0]?.[0];if(ch&&ch.length){this.port.postMessage(ch.slice(0));}return true}}registerProcessor('ps16-mic-capture',PS16MicCapture);`;
+          const blob=new Blob([workletCode],{type:'application/javascript'});
+          const url=URL.createObjectURL(blob);
+          await ctx.audioWorklet.addModule(url);
+          URL.revokeObjectURL(url);
+          window._ps16MicWorkletLoaded=true;
+        }
+        const node=new AudioWorkletNode(ctx,'ps16-mic-capture',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1]});
+        const silent=ctx.createGain(); silent.gain.value=0;
+        node.port.onmessage=e=>{
+          if(!micHoldActive) return;
+          const input=e.data;
+          if(!input || !input.length) return;
+          const copy=new Float32Array(input.length); copy.set(input);
+          micPcmChunks.push(copy); micPcmFrames+=copy.length;
+        };
+        micSource.connect(node); node.connect(silent); silent.connect(ctx.destination);
+        window._ps16MicWorkletNode=node; window._ps16MicWorkletSilent=silent;
+        captureReady=true;
+      }catch(err){ console.warn('AudioWorklet mic capture unavailable; falling back',err); }
+    }
+
+    // Fallback path for browsers without AudioWorklet support.
+    if(!captureReady){
+      micProcessor=ctx.createScriptProcessor(2048,1,1);
+      micSilentGain=ctx.createGain(); micSilentGain.gain.value=0;
+      micProcessor.onaudioprocess=e=>{
+        if(!micHoldActive) return;
+        const input=e.inputBuffer.getChannelData(0);
+        const copy=new Float32Array(input.length); copy.set(input);
+        micPcmChunks.push(copy); micPcmFrames+=copy.length;
+      };
+      micSource.connect(micProcessor);
+      micProcessor.connect(micSilentGain);
+      micSilentGain.connect(ctx.destination);
+    }
+
     micStartedAt=performance.now();
     $('micRecord').classList.add('recording'); $('micRecord').textContent='● RECORDING — RELEASE';
     setMicStatus('recording…',true);
@@ -1328,16 +1412,48 @@ async function beginMicRecording(){
     console.error(err); cleanupMicHold();
     micPermissionReady=false;
     $('micRecord').textContent='🎙 TAP TO ENABLE MIC';
-    setMicStatus('permission needed');
+    setMicStatus('mic start failed');
+    alert('PS-16 could not start microphone capture in this browser. Check Chrome site permissions and reload the page.');
   }
 }
+
+async function finishPcmRecording(){
+  const chunks=micPcmChunks.slice(), total=micPcmFrames;
+  cleanupMicHold(false);
+  if(!chunks.length || total<128){ setMicStatus('no audio captured'); return; }
+  try{
+    const buf=ctx.createBuffer(1,total,ctx.sampleRate);
+    const out=buf.getChannelData(0);
+    let pos=0;
+    for(const chunk of chunks){ out.set(chunk,pos); pos+=chunk.length; }
+    const blob=wavFromAudioBuffer(buf);
+    const p=currentPadObj();
+    p.buffer=buf; p.sourceBlob=blob; p.engine=null; p.oneShot=true;
+    p.name='MIC '+String(selectedPad+1).padStart(2,'0'); p.start=0; p.end=1;
+    renderPads(); updateSelectedLabel(); syncControls();
+    setMicStatus(buf.duration.toFixed(1)+'s captured');
+    auditionSelected(50); scheduleAutoSave();
+  }catch(err){
+    console.error(err); setMicStatus('capture failed');
+    alert('The microphone was recorded, but PS-16 could not create the sample buffer.');
+  }
+}
+
 function stopMicRecordHold(){
+  if(!micProcessor && !window._ps16MicWorkletNode) { micHoldActive=false; return; }
   micHoldActive=false;
-  if(micRecorder?.state==='recording') micRecorder.stop();
+  finishPcmRecording();
 }
 function cleanupMicHold(resetStatus=true){
   if(micStopTimer){clearTimeout(micStopTimer);micStopTimer=null}
   if(micTicker){clearInterval(micTicker);micTicker=null}
+  try{micProcessor?.disconnect()}catch(_){}; try{micSource?.disconnect()}catch(_){}; try{micSilentGain?.disconnect()}catch(_){};
+  if(micProcessor) micProcessor.onaudioprocess=null;
+  try{window._ps16MicWorkletNode?.disconnect()}catch(_){};
+  try{window._ps16MicWorkletSilent?.disconnect()}catch(_){};
+  if(window._ps16MicWorkletNode?.port) window._ps16MicWorkletNode.port.onmessage=null;
+  window._ps16MicWorkletNode=null; window._ps16MicWorkletSilent=null;
+  micProcessor=null; micSource=null; micSilentGain=null;
   micStream?.getTracks?.().forEach(t=>t.stop()); micStream=null;
   $('micRecord')?.classList.remove('recording');
   if($('micRecord')) $('micRecord').textContent=micPermissionReady?'● HOLD TO SAMPLE':'🎙 TAP TO ENABLE MIC';
@@ -1346,23 +1462,17 @@ function cleanupMicHold(resetStatus=true){
 const micBtn=$('micRecord');
 let micPressStarted=false;
 micBtn.addEventListener('click',async e=>{
-  if(!micPermissionReady){
-    e.preventDefault();
-    await requestMicPermission();
-  }
+  if(!micPermissionReady){ e.preventDefault(); await requestMicPermission(); }
 });
 micBtn.addEventListener('pointerdown',e=>{
-  if(!micPermissionReady) return; // first tap is permission request only
-  e.preventDefault();
-  micPressStarted=true;
+  if(!micPermissionReady) return;
+  e.preventDefault(); micPressStarted=true;
   try{micBtn.setPointerCapture?.(e.pointerId)}catch(_){}
   beginMicRecording();
 });
 ['pointerup','pointercancel','lostpointercapture'].forEach(type=>micBtn.addEventListener(type,e=>{
   if(!micPressStarted) return;
-  e.preventDefault();
-  micPressStarted=false;
-  stopMicRecordHold();
+  e.preventDefault(); micPressStarted=false; stopMicRecordHold();
 }));
 micBtn.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -1381,8 +1491,9 @@ $('stepToneLock').addEventListener('input',e=>{if(selectedLockStep===null)return
 $('stepGritLock').addEventListener('input',e=>{if(selectedLockStep===null)return;const v=+e.target.value;currentPadObj().gritLocks[selectedLockStep]=v<0?null:v/100;commitStepLock();});
 $('stepPanLock').addEventListener('input',e=>{if(selectedLockStep===null)return;const v=+e.target.value;currentPadObj().panLocks[selectedLockStep]=v<-100?null:v/100;commitStepLock();});
 $('stepDecayLock').addEventListener('input',e=>{if(selectedLockStep===null)return;const v=+e.target.value;currentPadObj().decayLocks[selectedLockStep]=v<0?null:Math.max(.03,v/100);commitStepLock();});
-$('clearStepLocks').onclick=()=>{if(selectedLockStep===null)return;const p=currentPadObj(),i=selectedLockStep;p.pitchLocks[i]=null;p.probabilityLocks[i]=100;p.ratchetLocks[i]=1;p.toneLocks[i]=p.gritLocks[i]=p.panLocks[i]=p.decayLocks[i]=null;commitStepLock();};
-function clearLocks(p){p.pitchLocks.fill(null);p.probabilityLocks.fill(100);p.ratchetLocks.fill(1);p.toneLocks.fill(null);p.gritLocks.fill(null);p.panLocks.fill(null);p.decayLocks.fill(null)}
+$('stepTimingLock').addEventListener('input',e=>{if(selectedLockStep===null)return;currentPadObj().timingLocks[selectedLockStep]=Math.max(-.49,Math.min(.49,+e.target.value/100));commitStepLock();});
+$('clearStepLocks').onclick=()=>{if(selectedLockStep===null)return;const p=currentPadObj(),i=selectedLockStep;p.pitchLocks[i]=null;p.probabilityLocks[i]=100;p.ratchetLocks[i]=1;p.toneLocks[i]=p.gritLocks[i]=p.panLocks[i]=p.decayLocks[i]=null;p.timingLocks[i]=0;commitStepLock();};
+function clearLocks(p){p.pitchLocks.fill(null);p.probabilityLocks.fill(100);p.ratchetLocks.fill(1);p.toneLocks.fill(null);p.gritLocks.fill(null);p.panLocks.fill(null);p.decayLocks.fill(null);if(p.timingLocks)p.timingLocks.fill(0)}
 $('clearPattern').onclick=()=>{ currentPadObj().steps.fill(false); clearLocks(currentPadObj()); selectedLockStep=null; saveCurrentPattern(); renderSteps(); renderPitchLockEditor(); };
 $('clearBankPattern').onclick=()=>{ banks[selectedBank].pads.forEach(p=>{p.steps.fill(false);clearLocks(p)}); selectedLockStep=null; saveCurrentPattern(); renderSteps(); renderPitchLockEditor(); };
 $('randomPattern').onclick=()=>{ currentPadObj().steps=currentPadObj().steps.map(()=>Math.random()<.28); saveCurrentPattern(); renderSteps(); };
@@ -1392,7 +1503,7 @@ $('chopSample').onclick=async()=>{
   bank.pads.forEach((p,i)=>{p.buffer=buf;p.sourceBlob=blob;p.engine=null;p.oneShot=true;p.name='SLICE '+(i+1);p.start=i/16;p.end=(i+1)/16;p.pitch=0;});
   renderPads(); syncControls(); scheduleAutoSave();
 };
-const SCALE_INTERVALS={minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],pentMinor:[0,3,5,7,10],pentMajor:[0,2,4,7,9],dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10]};
+const SCALE_INTERVALS={chromatic:[0,1,2,3,4,5,6,7,8,9,10,11],minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],pentMinor:[0,3,5,7,10],pentMajor:[0,2,4,7,9],dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10]};
 const ROOTS={'C':0,'C#':1,'D':2,'D#':3,'E':4,'F':5,'F#':6,'G':7,'G#':8,'A':9,'A#':10,'B':11};
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function markScaleApplied(){
@@ -1406,10 +1517,42 @@ function markScaleDirty(){
   const btn=$('applyScale');
   btn.classList.remove('assigned');
   btn.textContent='APPLY TO ACID PADS';
+  const sampleBtn=$('mapSampleScale');
+  if(sampleBtn){sampleBtn.classList.remove('assigned');sampleBtn.textContent='MAP SELECTED SAMPLE → 16 PADS';}
 }
 $('scaleRoot').addEventListener('change',markScaleDirty);
 $('scaleType').addEventListener('change',markScaleDirty);
 $('applyScale').onclick=()=>{const root=$('scaleRoot').value, ints=SCALE_INTERVALS[$('scaleType').value]||SCALE_INTERVALS.minor, acid=banks[7].pads, baseMidi=36+ROOTS[root];acid.forEach((p,i)=>{const degree=ints[i%ints.length]+12*Math.floor(i/ints.length),m=baseMidi+degree;p.noteHz=440*Math.pow(2,(m-69)/12);p.name='ACID '+NOTE_NAMES[m%12]+(Math.floor(m/12)-1);});if(selectedBank===7)renderPads();markScaleApplied();scheduleAutoSave();};
+
+$('mapSampleScale').onclick=async()=>{
+  const src=currentPadObj();
+  if(!src.buffer || src.engine==='acid'){
+    alert('Select a recorded or imported sample first. The selected sample will be treated as the root note.');
+    return;
+  }
+  if(selectedBank===7){
+    alert('Choose a DRUMS, BASS, SYNTH or USER bank for sample-scale mapping. The ACID bank keeps its dedicated synth engine.');
+    return;
+  }
+  const root=$('scaleRoot').value;
+  const ints=SCALE_INTERVALS[$('scaleType').value]||SCALE_INTERVALS.chromatic;
+  const bank=banks[selectedBank];
+  const buf=src.buffer, blob=src.sourceBlob||null;
+  for(let i=0;i<NUM_PADS;i++){
+    const degree=ints[i%ints.length]+12*Math.floor(i/ints.length);
+    const midi=60+ROOTS[root]+degree;
+    const p=bank.pads[i];
+    p.buffer=buf; p.sourceBlob=blob; p.engine=null; p.oneShot=true;
+    p.name='SMP '+NOTE_NAMES[midi%12]+(Math.floor(midi/12)-1);
+    p.start=src.start??0; p.end=src.end??1; p.pitch=degree;
+  }
+  renderPads(); selectPad(0); syncControls();
+  await saveProject(false);
+  const btn=$('mapSampleScale');
+  const scaleLabel=$('scaleType').selectedOptions[0]?.textContent||$('scaleType').value;
+  btn.classList.add('assigned');
+  btn.textContent=`✓ ${root} ${scaleLabel.toUpperCase()} SAMPLE MAP`;
+};
 
 $('filter').addEventListener('input',e=>{ if(filterNode&&ctx) filterNode.frequency.setTargetAtTime(+e.target.value,ctx.currentTime,.01); });
 $('delay').addEventListener('input',e=>{ const w=e.target._wet; if(w&&ctx) w.gain.setTargetAtTime(+e.target.value,ctx.currentTime,.01); });
@@ -1707,7 +1850,7 @@ async function exportWav(){
           const basePitch=snap.pitches?.[bi]?.[pi]??p.pitch;
           const overrides={tone:snap.toneLocks?.[bi]?.[pi]?.[step]??null,grit:snap.gritLocks?.[bi]?.[pi]?.[step]??null,pan:snap.panLocks?.[bi]?.[pi]?.[step]??null,decay:snap.decayLocks?.[bi]?.[pi]?.[step]??null};
           for(let r=0;r<reps;r++){
-            const rt=t+r*stepDur/reps;
+            const micro=Math.max(-.49,Math.min(.49,snap.timingLocks?.[bi]?.[pi]?.[step]??0)); const rt=Math.max(0,t+(micro*stepDur)+r*stepDur/reps);
             if(p.engine==='acid')scheduleExportAcid(octx,outs[bi],p,basePitch,pitchOff,rt,overrides,lastFreq);
             else scheduleExportSample(octx,outs[bi],p,basePitch,pitchOff,rt,overrides);
           }

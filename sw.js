@@ -1,4 +1,4 @@
-const CACHE = 'ps16-pcm-mic-v1';
+const CACHE = 'ps16-20260924-live-record-v1';
 const ASSETS = [
   './',
   './index.html',

@@ -224,3 +224,15 @@ PS-16 is an experimental groovebox project and is still evolving. The current fo
 ## Audio startup
 
 Audio starts automatically on the first Play or pad tap. There is no separate Enable Audio step.
+
+## Live recording and microtiming
+
+PS-16 can now record pad performances in real time. Open **Sequencer → Live Record**, choose a quantise grid and strength, then tap **REC** and play the pads.
+
+- **0% quantise strength** keeps the feel of the performance, storing early/late timing as microtiming offsets.
+- **100%** pulls hits fully to the selected grid.
+- Grid choices: **1/4, 1/8, 1/16 and 1/32**.
+- Long-press a sequencer step and use **TIMING** to manually move that hit early or late.
+- Microtiming is stored per pattern, follows chains, and is included in WAV export.
+
+PS-16 still uses a 16-step pattern model, so this first version stores one hit per pad per base step rather than unlimited free-running events.
